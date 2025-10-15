@@ -17,6 +17,7 @@ This repo runs a Minecraft server in Docker and exposes a minimal control API (F
 - Web UI (static): `web/index.html`, `web/app.ts` (compiled to `app.js`), and `web/logs.*` for a simple logs page.
 
 ### Control API endpoints (selected)
+
 - `GET /healthz` (no auth)
 - `GET /status` → { container status, players[], last_backup, server_name }
 - `POST /start` | `POST /restart` | `POST /stop` (stop returns 409 if players are online)
@@ -25,11 +26,13 @@ This repo runs a Minecraft server in Docker and exposes a minimal control API (F
 - `POST /git/pull` | `POST /git/push`
 
 ### How pieces talk to each other
+
 - Web UI fetches `${API_BASE}/...` with `Authorization: Bearer ${API_TOKEN}`; see `web/app.ts` (`doCall`, `sendChat`).
 - FastAPI talks to Docker Engine via mounted `/var/run/docker.sock` (see compose). It creates the `mc` container with desired env and `/data` bind.
 - Player awareness and chat go through RCON to the `mc` service on the compose network (not published to host by default).
 
 ### Important behaviors and conventions
+
 - Start flow (`/start`): `GitSync.ensure_repo()+pull()` → `mc_manager.enforce_server_properties()` → ensure/create container → start.
 - Stop flow (`/stop`): deny if players online (409); on success, `GitSync.commit_and_push()` and record timestamp in `/data/.mc_control_state.json`.
 - Custom JAR detection (see `mc_manager.desired_env()`):
@@ -39,6 +42,7 @@ This repo runs a Minecraft server in Docker and exposes a minimal control API (F
 - CORS is locked to `settings.cors_origin` (set in `.env`). Use your GitHub Pages origin or `*` for testing.
 
 ### Dev/workflows agents should use
+
 - Backend (containerized):
   - Build/run API only: optional commands (Linux host) → docker compose build control-api; docker compose up -d control-api.
   - Exercise API: call `GET /healthz` (no auth) and authenticated endpoints with `Authorization: Bearer ${API_TOKEN}` from `.env`.
@@ -46,16 +50,19 @@ This repo runs a Minecraft server in Docker and exposes a minimal control API (F
   - In `web/`: `npm i` then `npm run build` to produce `app.js`/`logs.js`. `index.html` expects `window.CONFIG = { API_BASE, API_TOKEN }` (placeholders are `%%API_BASE%%`, `%%API_TOKEN%%` for static hosting pipelines).
 
 ### Patterns to follow when extending
+
 - New endpoints: add `dependencies=[Depends(require_token)]` unless explicitly public; return small Pydantic models (`ActionResponse`) or dicts for the UI.
 - Docker interactions: go through `DockerMCManager`; keep env derivation logic centralized in `desired_env()` and keep `/data` as the single source of truth for server bits.
 - If exposing new web actions, add a thin wrapper in `web/app.ts` using `doCall('path', 'METHOD')` and update the UI minimally.
 
 ### Integration knobs and envs (examples)
+
 - Token and CORS: `API_TOKEN`, `CORS_ORIGIN` in `.env` → `Settings` → `auth.require_token` and FastAPI CORS middleware.
 - MC runtime: `TYPE`, `VERSION`, `MEMORY`, `ENABLE_RCON`, `RCON_PASSWORD`, `SERVER_PORT` (via `.env` and enforced server.properties).
 - Git sync: `GIT_REPO`, `GIT_BRANCH`, `GIT_AUTO_PUSH`, `GIT_IGNORE_SERVER_PROPERTIES`.
 
 ### Gotchas
+
 - The target deployment is a Linux host with Docker and the UNIX socket mounted into `control-api`. RCON is intended for internal use only.
 - Stopping while players are online is a hard 409 to prevent data loss; client should handle and surface the message.
 - Chat history parsing is regex-based and may miss modded log formats; keep it simple or add parsers per format in `main.py`.
