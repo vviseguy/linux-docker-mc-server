@@ -8,6 +8,7 @@ from mcrcon import MCRcon
 
 from .config import settings
 
+
 class RconClient:
     def __init__(self, host: str | None = None, port: int | None = None, password: str | None = None):
         self.host = host or settings.rcon_host

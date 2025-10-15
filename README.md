@@ -6,7 +6,7 @@ This project lets you run a Minecraft server in Docker on a Linux machine and co
 - Control API: FastAPI + Docker SDK + RCON (checks if players are online before stopping)
 - Auth: simple bearer token
 - Config: `.env` file
- - Optional Git sync: pull your world/config/plugins from a Git repo into `/data`; push changes back on stop or periodically
+- Optional Git sync: pull your world/config/plugins from a Git repo into `/data`; push changes back on stop or periodically
 
 ## What the Minecraft image does
 
@@ -36,7 +36,7 @@ If `TYPE=CUSTOM`, the image runs the jar file you specify via `CUSTOM_SERVER` (w
 
 ## Setup
 
-1) Copy env and edit:
+1. Copy env and edit:
 
 ```bash
 cp .env.example .env
@@ -44,33 +44,34 @@ nano .env
 ```
 
 Key values:
+
 - `API_TOKEN`: a long random string
 - `CORS_ORIGIN`: your GitHub Pages origin (e.g., `https://youruser.github.io`)
 - `MC_DATA_DIR`: absolute path on the host for world data (e.g., `/opt/minecraft/data`)
 - `SERVER_PORT`: default 25565
 - `RCON_PASSWORD`: any secret (not exposed publicly)
 - (Optional) Git sync:
-	- `GIT_REPO`: Git URL of your world/config repository (HTTPS or SSH)
-	- `GIT_BRANCH`: branch name (default `main`)
-	- `GIT_AUTO_PUSH`: true to push changes on stop
-	- `GIT_PUSH_INTERVAL_SECONDS`: periodic push interval (not enabled by default loop)
-	- `GIT_IGNORE_SERVER_PROPERTIES`: true to avoid committing your local `server.properties`
+  - `GIT_REPO`: Git URL of your world/config repository (HTTPS or SSH)
+  - `GIT_BRANCH`: branch name (default `main`)
+  - `GIT_AUTO_PUSH`: true to push changes on stop
+  - `GIT_PUSH_INTERVAL_SECONDS`: periodic push interval (not enabled by default loop)
+  - `GIT_IGNORE_SERVER_PROPERTIES`: true to avoid committing your local `server.properties`
 
-2) Create data directory and accept EULA:
+2. Create data directory and accept EULA:
 
 ```bash
 sudo mkdir -p /opt/minecraft/data
 sudo chown $USER:$USER /opt/minecraft -R
 ```
 
-3) Build and start control API only (first time):
+3. Build and start control API only (first time):
 
 ```bash
 docker compose build control-api
 docker compose up -d control-api
 ```
 
-4) Start Minecraft via API:
+4. Start Minecraft via API:
 
 ```bash
 curl -H "Authorization: Bearer $API_TOKEN" http://localhost:8080/start
@@ -93,10 +94,12 @@ Auth: `Authorization: Bearer <API_TOKEN>`
 ## Exposing ports and testing
 
 Ensure your firewall and router allow:
+
 - TCP/UDP 25565 to your host
 - TCP 8080 to your host (or serve behind a reverse proxy and TLS)
 
 Local tests on the Linux host:
+
 ```bash
 # API health
 curl http://localhost:8080/healthz
@@ -108,6 +111,7 @@ ss -tulpen | grep -E ":(25565|8080)\b"
 ```
 
 Remote tests (from another machine):
+
 ```bash
 # Control API
 curl -H "Authorization: Bearer YOUR_TOKEN" http://YOUR_HOST_OR_DOMAIN:8080/status
@@ -118,6 +122,7 @@ nc -zv YOUR_HOST_OR_DOMAIN 25565
 ## GitHub Pages front-end
 
 Use `web/index.html` as a simple static page. Host it on GitHub Pages and set:
+
 - API base: `https://your-domain:8080` (or your reverse-proxied HTTPS URL)
 - API token: your token
 
@@ -126,21 +131,25 @@ In `.env`, set `CORS_ORIGIN=https://youruser.github.io` so browsers can call you
 ## Script parsing and custom jar detection
 
 If your repo includes a `start.sh` or `start.bat`, we try to parse a simple `java ... -jar YourServer.jar ...` line and extract:
+
 - The jar filename to run
 - JVM memory flags (-Xms/-Xmx) and `nogui` if present
 
 Parsing succeeds for straightforward scripts; if it fails, we fall back to autodetecting a jar in `/data`:
+
 - Prefer `server.jar`
 - Otherwise match common names like `paper-*.jar`, `purpur-*.jar`, etc.
 - If exactly one `.jar` is present, use it
 
 Memory behavior:
+
 - If the script sets `-Xms` and `-Xmx` to the same value, we set `MEMORY` to that value for the container (letting the image manage the rest)
 - Otherwise, we pass the specific flags via `JVM_OPTS`
 
 ## Admin interaction (in-server)
 
 - Use RCON from the control API internally. If you want CLI access, exec into the container:
+
 ```bash
 docker exec -it mc-server rcon-cli
 # or attach to console
@@ -156,6 +165,7 @@ docker attach mc-server
 ## Update/maintenance
 
 - To update the server image:
+
 ```bash
 docker compose pull mc
 # restart via API or docker compose
@@ -166,12 +176,16 @@ docker compose pull mc
 ## Troubleshooting
 
 - Control API logs:
+
 ```bash
 docker logs -f mc-control-api
 ```
+
 - Minecraft logs:
+
 ```bash
 docker logs -f mc-server
 ```
+
 - Permission issues on data dir: ensure the host path exists and is writable.
 - Custom JAR not detected: ensure `.jar` is at the root of `/data` and named `server.jar` (preferred) or a recognizable pattern like `paper-*.jar`. When detected, container switches to `TYPE=CUSTOM`.

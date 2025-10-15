@@ -7,8 +7,10 @@ import os
 import re
 
 from .config import settings
+
 DATA_DIR = "/data"  # path inside control-api container
 from .git_sync import GitSync
+
 
 class DockerMCManager:
     """
@@ -68,13 +70,13 @@ class DockerMCManager:
         candidates: list[str] = []
         try:
             for name in os.listdir(data_dir):
-                if name.endswith('.jar'):
+                if name.endswith(".jar"):
                     candidates.append(name)
         except FileNotFoundError:
             return None
         # prefer server.jar
-        if 'server.jar' in candidates:
-            return 'server.jar'
+        if "server.jar" in candidates:
+            return "server.jar"
         for prefix in ("paper-", "purpur-", "fabric-", "forge-", "spigot-", "vanilla-", "quilt-"):
             for c in candidates:
                 if c.startswith(prefix):
@@ -88,25 +90,25 @@ class DockerMCManager:
         This will add or update:
           rcon.port, rcon.password, enable-rcon, server-port
         """
-        path = os.path.join(DATA_DIR, 'server.properties')
+        path = os.path.join(DATA_DIR, "server.properties")
         props: Dict[str, str] = {}
         if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()
-                    if not line or line.startswith('#'):
+                    if not line or line.startswith("#"):
                         continue
-                    if '=' in line:
-                        k, v = line.split('=', 1)
+                    if "=" in line:
+                        k, v = line.split("=", 1)
                         props[k] = v
         # set enforced values
-        props['enable-rcon'] = 'true' if settings.enable_rcon else 'false'
-        props['rcon.password'] = settings.rcon_password
-        props['rcon.port'] = str(settings.rcon_port)
-        props['server-port'] = str(settings.server_port)
+        props["enable-rcon"] = "true" if settings.enable_rcon else "false"
+        props["rcon.password"] = settings.rcon_password
+        props["rcon.port"] = str(settings.rcon_port)
+        props["server-port"] = str(settings.server_port)
         # write back
         os.makedirs(DATA_DIR, exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             for k, v in props.items():
                 f.write(f"{k}={v}\n")
 
@@ -124,7 +126,7 @@ class DockerMCManager:
             if not os.path.exists(path):
                 continue
             try:
-                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
             except Exception:
                 continue
@@ -143,7 +145,7 @@ class DockerMCManager:
             jar_name = os.path.basename(jar_path)
             # Extract -Xms and -Xmx from the whole java command region
             java_segment_match = re.search(r"java([^\n]*)", content, flags=re.IGNORECASE)
-            segment = (java_segment_match.group(0) if java_segment_match else content)
+            segment = java_segment_match.group(0) if java_segment_match else content
             xmx = None
             xms = None
             xmx_m = re.search(r"-Xmx(\S+)", segment)

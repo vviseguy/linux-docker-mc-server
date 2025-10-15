@@ -9,6 +9,7 @@ from .config import settings
 
 DATA_DIR = "/data"
 
+
 class GitSync:
     def __init__(self, repo_url: Optional[str] = None, branch: Optional[str] = None):
         self.repo_url = repo_url or settings.git_repo
@@ -33,7 +34,7 @@ class GitSync:
         if is_empty:
             self._run("git", "clone", "--branch", self.branch, self.repo_url, self.workdir)
         else:
-            self._run("git", "init" , cwd=self.workdir)
+            self._run("git", "init", cwd=self.workdir)
             self._run("git", "remote", "remove", "origin", cwd=self.workdir, check=False)
             self._run("git", "remote", "add", "origin", self.repo_url, cwd=self.workdir)
             self._run("git", "fetch", "origin", self.branch, cwd=self.workdir)
@@ -52,8 +53,8 @@ class GitSync:
             return "push disabled"
         # configure identity (optional)
         try:
-            self._run("git", "config", "user.email", "mc-control@example" , cwd=self.workdir)
-            self._run("git", "config", "user.name", "mc-control" , cwd=self.workdir)
+            self._run("git", "config", "user.email", "mc-control@example", cwd=self.workdir)
+            self._run("git", "config", "user.name", "mc-control", cwd=self.workdir)
         except Exception:
             pass
         # Add all, but optionally restore server.properties from HEAD

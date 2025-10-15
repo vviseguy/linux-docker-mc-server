@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -34,5 +35,6 @@ class Settings(BaseSettings):
     git_auto_push: bool = Field(default=True)
     git_push_interval_seconds: int = Field(default=300)
     git_ignore_server_properties: bool = Field(default=True)
+
 
 settings = Settings()

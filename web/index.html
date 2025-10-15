@@ -111,8 +111,8 @@
       }
       .btn-accent:hover,
       .btn-accent:active {
-        color: #0a1021 !important;
-        filter: brightness(1.02);
+        background: #3b82f6; /* darker */
+        filter: none;
       }
       .btn-danger {
         background: #f87171;
@@ -121,8 +121,8 @@
       }
       .btn-danger:hover,
       .btn-danger:active {
-        color: #0a1021 !important;
-        filter: brightness(1.02);
+        background: #ef4444; /* darker */
+        filter: none;
       }
       button:disabled {
         opacity: 0.65;
@@ -324,16 +324,21 @@
             Send
           </button>
         </div>
-        <div class="row" style="margin-top: 0.5rem; justify-content: flex-end">
-          <a
-            href="./logs.html"
-            class="pill"
-            data-tip="Open logs page"
-            style="text-decoration: none; color: inherit"
-            >View logs »</a
-          >
-        </div>
       </section>
+    </div>
+    <div
+      style="
+        text-align: center;
+        color: var(--subtext);
+        font-size: 0.85rem;
+        margin: 0.25rem 0 1rem;
+      "
+    >
+      <a
+        href="./logs.html"
+        style="color: var(--subtext); text-decoration: underline"
+        >Logs</a
+      >
     </div>
     <div class="toasts" id="toasts"></div>
 
