@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "es2022",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./",
+    "allowJs": false,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2021", "DOM"]
+  },
+  "include": ["app.ts", "logs.ts"],
+  "exclude": ["node_modules"]
+}

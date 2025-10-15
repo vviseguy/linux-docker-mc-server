@@ -1,0 +1,10 @@
+# Node & TypeScript build artifacts
+web/node_modules/
+web/*.js.map
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
