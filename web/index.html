@@ -1,0 +1,754 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minecraft Chat Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg: #0c1021;
+        --panel: #151a33;
+        --accent: #5eead4;
+        --accent-2: #60a5fa;
+        --text: #e5e7eb;
+        --subtext: #9ca3af;
+        --danger: #f87171;
+        --ok: #34d399;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; color: var(--text);
+        background: radial-gradient(1000px 600px at 10% -10%, rgba(96,165,250,0.18), transparent),
+                    radial-gradient(800px 500px at 90% 10%, rgba(94,234,212,0.15), transparent),
+                    var(--bg);
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      }
+      header { padding: 2.2rem 1.25rem 0.5rem; text-align: center; }
+      .title { font-family: 'Press Start 2P', cursive; font-size: 1.35rem; letter-spacing: 1px; }
+      .subtitle { color: var(--subtext); margin-top: 0.5rem; font-size: 0.95rem; }
+      .container { max-width: 980px; margin: 1rem auto 2rem; padding: 0 1rem; }
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 12px; padding: 1rem; backdrop-filter: blur(4px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      }
+      .btns { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      button {
+        border: 1px solid rgba(255,255,255,0.15); color: var(--text); background: #0f1430;
+        padding: 0.6rem 0.9rem; border-radius: 10px; cursor: pointer; font-weight: 600;
+        transition: transform .06s ease, background .2s ease, border-color .2s ease, filter .2s ease, box-shadow .2s ease;
+      }
+      button:hover { transform: translateY(-1px); border-color: var(--accent); background: #11163a; filter: brightness(1.05); }
+      button:active { transform: translateY(0); filter: brightness(0.98); }
+      button:focus-visible { outline: 3px solid rgba(96,165,250,.6); outline-offset: 2px; box-shadow: 0 0 0 2px #0c1021; }
+      .btn-accent { background: #60a5fa; border: none; color: #0a1021 !important; }
+      .btn-accent:hover, .btn-accent:active { color: #0a1021 !important; filter: brightness(1.02); }
+      .btn-danger { background: #f87171; border: none; color: #0a1021 !important; }
+      .btn-danger:hover, .btn-danger:active { color: #0a1021 !important; filter: brightness(1.02); }
+      button:disabled { opacity: .65; cursor: not-allowed; filter: none !important; transform: none !important; }
+      .btn-accent:disabled, .btn-danger:disabled { color: #0a1021 !important; }
+      .status-line { display: flex; gap: .5rem; align-items: center; margin: .35rem 0; font-size: .95rem; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); display: inline-block; }
+      .dot.ok { background: var(--ok); } .dot.err { background: var(--danger); }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .log { background: #0a0e22; color: #d1d5db; padding: .75rem; border-radius: 10px; min-height: 96px; border: 1px solid rgba(255,255,255,0.06); }
+      #log { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+      .pill { display: inline-block; padding: .2rem .5rem; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
+      .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+
+      /* Tooltips */
+      [data-tip] { position: relative; }
+      [data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute; left: 0; top: calc(100% + 6px);
+        background: rgba(14,21,48,.98); color: var(--text);
+        border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
+        padding: .35rem .5rem; white-space: nowrap; font-size: .85rem;
+        box-shadow: 0 8px 24px rgba(0,0,0,.35);
+        z-index: 20;
+      }
+
+      /* Toasts */
+      .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 30; }
+      .toast { padding: .6rem .8rem; border-radius: 10px; color: #0a1021; font-weight: 600; box-shadow: 0 10px 24px rgba(0,0,0,.35); border: 1px solid rgba(0,0,0,.05); opacity: 0; transform: translateY(6px); animation: toast-in .25s forwards; }
+      .toast.info { background: #60a5fa; }
+      .toast.success { background: #34d399; }
+      .toast.error { background: #f87171; }
+      @keyframes toast-in { to { opacity: 1; transform: translateY(0); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="title">Minecraft Chat Console</div>
+      <div class="subtitle" id="server-name">—</div>
+    </header>
+    <div class="container">
+      <section class="card" style="padding: .75rem 1rem; margin-bottom: .75rem;">
+        <div class="row" style="justify-content: space-between; gap: .75rem; align-items: center;">
+          <div class="row">
+            <span id="s-dot" class="dot"></span>
+            <strong>Status:</strong>&nbsp;<span id="s-text">unknown</span>
+            <span class="pill" data-tip="Active player list reported via RCON">Players: <span id="s-players">—</span></span>
+            <span class="pill" data-tip="Last time a stop-and-push occurred">Last backup: <span id="last-backup">—</span></span>
+          </div>
+          <div class="btns">
+            <button onclick="doCall('start','POST')">Start</button>
+            <button onclick="doCall('restart','POST')">Restart</button>
+            <button class="btn-danger" onclick="doCall('stop','POST')">Stop (empty)</button>
+            <button class="btn-accent" onclick="doCall('status')">Refresh</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="display:flex; flex-direction: column; height: min(72vh, 900px);">
+        <div id="chatHistory" class="log" style="flex:1; overflow: auto; white-space: normal; background:#060a1a"></div>
+        <div class="row" style="margin-top:.75rem">
+          <input id="chatInput" class="mono" placeholder="Type a message to players and press Enter" style="flex:1; padding:.6rem; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:var(--text)"/>
+          <button class="btn-accent" onclick="sendChat()">Send</button>
+        </div>
+        <div class="log" id="log" style="margin-top:.5rem; min-height: 56px;">Ready.</div>
+      </section>
+    </div>
+    <div class="toasts" id="toasts"></div>
+
+    <script>
+      // Hard-coded (replaced by workflow)
+      const API_BASE = "%%API_BASE%%";
+      const API_TOKEN = "%%API_TOKEN%%";
+
+      const sDot = document.getElementById('s-dot');
+      const sText = document.getElementById('s-text');
+      const sPlayers = document.getElementById('s-players');
+      const lastBackupEl = document.getElementById('last-backup');
+      const chatInput = document.getElementById('chatInput');
+      const chatHistory = document.getElementById('chatHistory');
+      const log = document.getElementById('log');
+      const serverNameEl = document.getElementById('server-name');
+
+      function setStatus(status){
+        sText.textContent = status || 'unknown';
+        sDot.classList.remove('ok','err');
+        if(status === 'running'){ sDot.classList.add('ok'); }
+        else if(status === 'exited' || status === 'not-found' || status === 'not-created'){ sDot.classList.add('err'); }
+      }
+      function setLog(text){ log.textContent = text; }
+
+      function toast(msg, type = 'info', timeout = 3500){
+        const host = document.getElementById('toasts');
+        if(!host) return;
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.textContent = msg;
+        host.appendChild(el);
+        const t = setTimeout(()=>{
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(6px)';
+          setTimeout(()=>{ if(el.parentNode) host.removeChild(el); }, 250);
+        }, timeout);
+        el.addEventListener('click', ()=>{ clearTimeout(t); if(el.parentNode) host.removeChild(el); });
+      }
+
+      async function doCall(path, method='GET'){
+        const base = (API_BASE || '').replace(/\/$/, '');
+        if(!base || !API_TOKEN){ setLog('Configure API base and token.'); return; }
+        try{
+          const res = await fetch(`${base}/${path}`, { method, headers: { 'Authorization': `Bearer ${API_TOKEN}` }});
+          const raw = await res.text();
+          let parsed = null; try { parsed = JSON.parse(raw); } catch {}
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
+          const isHtml = /text\/html|<\s*!doctype|<\s*html/i.test(raw);
+          const bodyForLog = (!ct.includes('application/json') && isHtml) ? '[HTML response omitted]' : raw;
+          const pretty = parsed ? JSON.stringify(parsed, null, 2) : bodyForLog;
+          if(!res.ok){
+            const msg = parsed?.detail || parsed?.message || `${res.status} ${res.statusText}`;
+            setLog(`${res.status} ${res.statusText}\n${pretty}`);
+            toast(msg, 'error');
+          } else {
+            setLog(`${res.status} ${res.statusText}\n${pretty}`);
+          }
+          if(path==='status' && res.ok){
+            try{ const data = parsed ?? JSON.parse(raw);
+              setStatus(data?.container?.status);
+              if(data?.server_name){ serverNameEl.textContent = data.server_name; }
+              const players = data?.players || [];
+              sPlayers.textContent = players.length ? players.join(', ') : 'none';
+              if(data?.last_backup){
+                const d = new Date(data.last_backup * 1000);
+                lastBackupEl.textContent = d.toLocaleString();
+              } else { lastBackupEl.textContent = 'never'; }
+            }catch(e){ /* ignore */ }
+          } else if(['start','restart','stop'].includes(path)){
+            await doCall('status');
+          }
+        }catch(e){ setLog('Error: ' + e); toast(String(e), 'error'); }
+      }
+
+      async function loadChat(){
+        const base = (API_BASE || '').replace(/\/$/, '');
+        if(!base || !API_TOKEN){ return; }
+        try{
+          const res = await fetch(`${base}/chat/history?lines=400`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
+          const data = await res.json();
+          renderChat(data?.messages||[]);
+        }catch(e){ /* ignore */ }
+      }
+
+      function renderChat(items){
+        chatHistory.innerHTML = '';
+        for(const m of items){
+          const row = document.createElement('div');
+          row.style.margin = '.15rem 0';
+          row.innerHTML = `<span class="pill" style="margin-right:.35rem">${m.ts || ''}</span><strong>${escapeHtml(m.user)}</strong>: ${escapeHtml(m.text)}`;
+          chatHistory.appendChild(row);
+        }
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+
+      function escapeHtml(s){
+        return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+      }
+
+      chatInput.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          sendChat();
+        }
+      });
+
+      async function sendChat(){
+        const v = (chatInput.value||'').trim();
+        if(!v){ setLog('Type a message first'); return; }
+        try{
+          const res = await fetch(`${API_BASE.replace(/\/$/, '')}/chat`, { method: 'POST', headers: { 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type':'application/json' }, body: JSON.stringify({ message: v }) });
+          const raw = await res.text();
+          let parsed = null; try { parsed = JSON.parse(raw); } catch {}
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
+          const isHtml = /text\/html|<\s*!doctype|<\s*html/i.test(raw);
+          const bodyForLog = (!ct.includes('application/json') && isHtml) ? '[HTML response omitted]' : raw;
+          const pretty = parsed ? JSON.stringify(parsed, null, 2) : bodyForLog;
+          if(!res.ok){
+            const msg = parsed?.detail || parsed?.message || `${res.status} ${res.statusText}`;
+            toast(msg, 'error');
+            setLog(`${res.status} ${res.statusText}\n${pretty}`);
+            return;
+          }
+          toast('Message sent', 'success');
+          setLog(`${res.status} ${res.statusText}\n${pretty}`);
+          chatInput.value='';
+          loadChat();
+        }catch(e){ setLog('Error: ' + e); toast(String(e), 'error'); }
+      }
+
+      // initial loads and polling
+      doCall('status');
+      loadChat();
+      setInterval(loadChat, 4000);
+      setInterval(()=>doCall('status'), 10000);
+    </script>
+  </body>
+</html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minecraft Chat Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg: #0c1021;
+        --panel: #151a33;
+        --accent: #5eead4;
+        --accent-2: #60a5fa;
+        --text: #e5e7eb;
+        --subtext: #9ca3af;
+        --danger: #f87171;
+        --ok: #34d399;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; color: var(--text);
+        background: radial-gradient(1000px 600px at 10% -10%, rgba(96,165,250,0.18), transparent),
+                    radial-gradient(800px 500px at 90% 10%, rgba(94,234,212,0.15), transparent),
+                    var(--bg);
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      }
+      header { padding: 2.2rem 1.25rem 0.5rem; text-align: center; }
+      .title { font-family: 'Press Start 2P', cursive; font-size: 1.35rem; letter-spacing: 1px; }
+      .subtitle { color: var(--subtext); margin-top: 0.5rem; font-size: 0.95rem; }
+      .container { max-width: 980px; margin: 1rem auto 2rem; padding: 0 1rem; }
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 12px; padding: 1rem; backdrop-filter: blur(4px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      }
+      .btns { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      button {
+        border: 1px solid rgba(255,255,255,0.15); color: var(--text); background: #0f1430;
+        padding: 0.6rem 0.9rem; border-radius: 10px; cursor: pointer; font-weight: 600;
+        transition: transform .06s ease, background .2s ease, border-color .2s ease, filter .2s ease, box-shadow .2s ease;
+      }
+      button:hover { transform: translateY(-1px); border-color: var(--accent); background: #11163a; filter: brightness(1.05); }
+      button:active { transform: translateY(0); filter: brightness(0.98); }
+      button:focus-visible { outline: 3px solid rgba(96,165,250,.6); outline-offset: 2px; box-shadow: 0 0 0 2px #0c1021; }
+      .btn-accent { background: #60a5fa; border: none; color: #0a1021 !important; }
+      .btn-accent:hover, .btn-accent:active { color: #0a1021 !important; filter: brightness(1.02); }
+      .btn-danger { background: #f87171; border: none; color: #0a1021 !important; }
+      .btn-danger:hover, .btn-danger:active { color: #0a1021 !important; filter: brightness(1.02); }
+      button:disabled { opacity: .65; cursor: not-allowed; filter: none !important; transform: none !important; }
+      .btn-accent:disabled, .btn-danger:disabled { color: #0a1021 !important; }
+      .status-line { display: flex; gap: .5rem; align-items: center; margin: .35rem 0; font-size: .95rem; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); display: inline-block; }
+      .dot.ok { background: var(--ok); } .dot.err { background: var(--danger); }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .log { background: #0a0e22; color: #d1d5db; padding: .75rem; border-radius: 10px; min-height: 96px; border: 1px solid rgba(255,255,255,0.06); }
+      #log { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+      .pill { display: inline-block; padding: .2rem .5rem; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
+      .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+
+      /* Tooltips */
+      [data-tip] { position: relative; }
+      [data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute; left: 0; top: calc(100% + 6px);
+        background: rgba(14,21,48,.98); color: var(--text);
+        border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
+        padding: .35rem .5rem; white-space: nowrap; font-size: .85rem;
+        box-shadow: 0 8px 24px rgba(0,0,0,.35);
+        z-index: 20;
+      }
+
+      /* Toasts */
+      .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 30; }
+      .toast { padding: .6rem .8rem; border-radius: 10px; color: #0a1021; font-weight: 600; box-shadow: 0 10px 24px rgba(0,0,0,.35); border: 1px solid rgba(0,0,0,.05); opacity: 0; transform: translateY(6px); animation: toast-in .25s forwards; }
+      .toast.info { background: #60a5fa; }
+      .toast.success { background: #34d399; }
+      .toast.error { background: #f87171; }
+      @keyframes toast-in { to { opacity: 1; transform: translateY(0); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="title">Minecraft Chat Console</div>
+      <div class="subtitle" id="server-name">—</div>
+    </header>
+    <div class="container">
+      <section class="card" style="padding: .75rem 1rem; margin-bottom: .75rem;">
+        <div class="row" style="justify-content: space-between; gap: .75rem; align-items: center;">
+          <div class="row">
+            <span id="s-dot" class="dot"></span>
+            <strong>Status:</strong>&nbsp;<span id="s-text">unknown</span>
+            <span class="pill" data-tip="Active player list reported via RCON">Players: <span id="s-players">—</span></span>
+            <span class="pill" data-tip="Last time a stop-and-push occurred">Last backup: <span id="last-backup">—</span></span>
+          </div>
+          <div class="btns">
+            <button onclick="doCall('start','POST')">Start</button>
+            <button onclick="doCall('restart','POST')">Restart</button>
+            <button class="btn-danger" onclick="doCall('stop','POST')">Stop (empty)</button>
+            <button class="btn-accent" onclick="doCall('status')">Refresh</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="display:flex; flex-direction: column; height: min(72vh, 900px);">
+        <div id="chatHistory" class="log" style="flex:1; overflow: auto; white-space: normal; background:#060a1a"></div>
+        <div class="row" style="margin-top:.75rem">
+          <input id="chatInput" class="mono" placeholder="Type a message to players and press Enter" style="flex:1; padding:.6rem; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:var(--text)"/>
+          <button class="btn-accent" onclick="sendChat()">Send</button>
+        </div>
+        <div class="log" id="log" style="margin-top:.5rem; min-height: 56px;">Ready.</div>
+      </section>
+    </div>
+    <div class="toasts" id="toasts"></div>
+
+    <script>
+      // Hard-coded (replaced by workflow)
+      const API_BASE = "%%API_BASE%%";
+      const API_TOKEN = "%%API_TOKEN%%";
+
+      const sDot = document.getElementById('s-dot');
+      const sText = document.getElementById('s-text');
+      const sPlayers = document.getElementById('s-players');
+      const lastBackupEl = document.getElementById('last-backup');
+      const chatInput = document.getElementById('chatInput');
+      const chatHistory = document.getElementById('chatHistory');
+      const log = document.getElementById('log');
+      const serverNameEl = document.getElementById('server-name');
+
+      function setStatus(status){
+        sText.textContent = status || 'unknown';
+        sDot.classList.remove('ok','err');
+        if(status === 'running'){ sDot.classList.add('ok'); }
+        else if(status === 'exited' || status === 'not-found' || status === 'not-created'){ sDot.classList.add('err'); }
+      }
+      function setLog(text){ log.textContent = text; }
+
+      function toast(msg, type = 'info', timeout = 3500){
+        const host = document.getElementById('toasts');
+        if(!host) return;
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.textContent = msg;
+        host.appendChild(el);
+        const t = setTimeout(()=>{
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(6px)';
+          setTimeout(()=>{ if(el.parentNode) host.removeChild(el); }, 250);
+        }, timeout);
+        el.addEventListener('click', ()=>{ clearTimeout(t); if(el.parentNode) host.removeChild(el); });
+      }
+
+      async function doCall(path, method='GET'){
+        const base = (API_BASE || '').replace(/\/$/, '');
+        if(!base || !API_TOKEN){ setLog('Configure API base and token.'); return; }
+        try{
+          const res = await fetch(`${base}/${path}`, { method, headers: { 'Authorization': `Bearer ${API_TOKEN}` }});
+          const raw = await res.text();
+          let parsed = null; try { parsed = JSON.parse(raw); } catch {}
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
+          const isHtml = /text\/html|<\s*!doctype|<\s*html/i.test(raw);
+          const bodyForLog = (!ct.includes('application/json') && isHtml) ? '[HTML response omitted]' : raw;
+          const pretty = parsed ? JSON.stringify(parsed, null, 2) : bodyForLog;
+          if(!res.ok){
+            const msg = parsed?.detail || parsed?.message || `${res.status} ${res.statusText}`;
+            setLog(`${res.status} ${res.statusText}\n${pretty}`);
+            toast(msg, 'error');
+          } else {
+            setLog(`${res.status} ${res.statusText}\n${pretty}`);
+          }
+          if(path==='status' && res.ok){
+            try{ const data = parsed ?? JSON.parse(raw);
+              setStatus(data?.container?.status);
+              if(data?.server_name){ serverNameEl.textContent = data.server_name; }
+              const players = data?.players || [];
+              sPlayers.textContent = players.length ? players.join(', ') : 'none';
+              if(data?.last_backup){
+                const d = new Date(data.last_backup * 1000);
+                lastBackupEl.textContent = d.toLocaleString();
+              } else { lastBackupEl.textContent = 'never'; }
+            }catch(e){ /* ignore */ }
+          } else if(['start','restart','stop'].includes(path)){
+            await doCall('status');
+          }
+        }catch(e){ setLog('Error: ' + e); toast(String(e), 'error'); }
+      }
+
+      async function loadChat(){
+        const base = (API_BASE || '').replace(/\/$/, '');
+        if(!base || !API_TOKEN){ return; }
+        try{
+          const res = await fetch(`${base}/chat/history?lines=400`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
+          const data = await res.json();
+          renderChat(data?.messages||[]);
+        }catch(e){ /* ignore */ }
+      }
+
+      function renderChat(items){
+        chatHistory.innerHTML = '';
+        for(const m of items){
+          const row = document.createElement('div');
+          row.style.margin = '.15rem 0';
+          row.innerHTML = `<span class="pill" style="margin-right:.35rem">${m.ts || ''}</span><strong>${escapeHtml(m.user)}</strong>: ${escapeHtml(m.text)}`;
+          chatHistory.appendChild(row);
+        }
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+
+      function escapeHtml(s){
+        return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+      }
+
+      chatInput.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          sendChat();
+        }
+      });
+
+      async function sendChat(){
+        const v = (chatInput.value||'').trim();
+        if(!v){ setLog('Type a message first'); return; }
+        try{
+          const res = await fetch(`${API_BASE.replace(/\/$/, '')}/chat`, { method: 'POST', headers: { 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type':'application/json' }, body: JSON.stringify({ message: v }) });
+          const raw = await res.text();
+          let parsed = null; try { parsed = JSON.parse(raw); } catch {}
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
+          const isHtml = /text\/html|<\s*!doctype|<\s*html/i.test(raw);
+          const bodyForLog = (!ct.includes('application/json') && isHtml) ? '[HTML response omitted]' : raw;
+          const pretty = parsed ? JSON.stringify(parsed, null, 2) : bodyForLog;
+          if(!res.ok){
+            const msg = parsed?.detail || parsed?.message || `${res.status} ${res.statusText}`;
+            toast(msg, 'error');
+            setLog(`${res.status} ${res.statusText}\n${pretty}`);
+            return;
+          }
+          toast('Message sent', 'success');
+          setLog(`${res.status} ${res.statusText}\n${pretty}`);
+          chatInput.value='';
+          loadChat();
+        }catch(e){ setLog('Error: ' + e); toast(String(e), 'error'); }
+      }
+
+      // initial loads and polling
+      doCall('status');
+      loadChat();
+      setInterval(loadChat, 4000);
+      setInterval(()=>doCall('status'), 10000);
+    </script>
+  </body>
+  </html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minecraft Chat Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+      <header>
+        <div class="title">Minecraft Chat Console</div>
+        <div class="subtitle" id="server-name">—</div>
+      </header>
+        --panel: #151a33;
+        --accent: #5eead4;
+        --accent-2: #60a5fa;
+        --text: #e5e7eb;
+        --subtext: #9ca3af;
+        button {
+          border: 1px solid rgba(255,255,255,0.15); color: var(--text); background: #0f1430;
+          padding: 0.6rem 0.9rem; border-radius: 10px; cursor: pointer; font-weight: 600;
+          transition: transform .06s ease, background .2s ease, border-color .2s ease, filter .2s ease, box-shadow .2s ease;
+        }
+        --ok: #34d399;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+    .btn-accent { background: #60a5fa; border: none; color: #0a1021 !important; }
+    .btn-accent:hover, .btn-accent:active { color: #0a1021 !important; filter: brightness(1.02); }
+    .btn-danger { background: #f87171; border: none; color: #0a1021 !important; }
+    .btn-danger:hover, .btn-danger:active { color: #0a1021 !important; filter: brightness(1.02); }
+        button:disabled { opacity: .65; cursor: not-allowed; filter: none !important; transform: none !important; }
+        .btn-accent:disabled, .btn-danger:disabled { color: #0a1021 !important; }
+                    var(--bg);
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+              <span class="pill" data-tip="Active player list reported via RCON">Players: <span id="s-players">—</span></span>
+      header { padding: 2.2rem 1.25rem 0.5rem; text-align: center; }
+      .title { font-family: 'Press Start 2P', cursive; font-size: 1.35rem; letter-spacing: 1px; }
+        const serverNameEl = document.getElementById('server-name');
+      .container { max-width: 980px; margin: 1rem auto 2rem; padding: 0 1rem; }
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 12px; padding: 1rem; backdrop-filter: blur(4px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      }
+      .btns { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      button {
+        border: 1px solid rgba(255,255,255,0.15); color: var(--text); background: #0f1430;
+        padding: 0.6rem 0.9rem; border-radius: 10px; cursor: pointer; font-weight: 600;
+        transition: transform .06s ease, background .2s ease, border-color .2s ease, filter .2s ease, box-shadow .2s ease;
+      }
+      button:hover { transform: translateY(-1px); border-color: var(--accent); background: #11163a; filter: brightness(1.05); }
+      button:active { transform: translateY(0); filter: brightness(0.98); }
+      button:focus-visible { outline: 3px solid rgba(96,165,250,.6); outline-offset: 2px; box-shadow: 0 0 0 2px #0c1021; }
+  .btn-accent { background: #60a5fa; border: none; color: #0a1021; }
+                if(data?.server_name){ serverNameEl.textContent = data.server_name; }
+  .btn-danger { background: #f87171; border: none; color: #0a1021; }
+  .btn-danger:hover, .btn-danger:active { color: #0a1021; filter: brightness(1.02); }
+      .status-line { display: flex; gap: .5rem; align-items: center; margin: .35rem 0; font-size: .95rem; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); display: inline-block; }
+      .dot.ok { background: var(--ok); } .dot.err { background: var(--danger); }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .log { background: #0a0e22; color: #d1d5db; padding: .75rem; border-radius: 10px; min-height: 96px; border: 1px solid rgba(255,255,255,0.06); }
+  #log { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+      .pill { display: inline-block; padding: .2rem .5rem; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
+      .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+
+      /* Tooltips */
+      [data-tip] { position: relative; }
+      [data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute; left: 0; top: calc(100% + 6px);
+        background: rgba(14,21,48,.98); color: var(--text);
+        border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
+        padding: .35rem .5rem; white-space: nowrap; font-size: .85rem;
+        box-shadow: 0 8px 24px rgba(0,0,0,.35);
+        z-index: 20;
+      }
+
+      /* Toasts */
+      .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 30; }
+  .toast { padding: .6rem .8rem; border-radius: 10px; color: #0a1021; font-weight: 600; box-shadow: 0 10px 24px rgba(0,0,0,.35); border: 1px solid rgba(0,0,0,.05); opacity: 0; transform: translateY(6px); animation: toast-in .25s forwards; }
+  .toast.info { background: #60a5fa; }
+  .toast.success { background: #34d399; }
+  .toast.error { background: #f87171; }
+      @keyframes toast-in { to { opacity: 1; transform: translateY(0); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="title">Minecraft Chat Console</div>
+      <div class="subtitle">Talk with players • Control server • See status</div>
+    </header>
+    <div class="container">
+      <section class="card" style="padding: .75rem 1rem; margin-bottom: .75rem;">
+        <div class="row" style="justify-content: space-between; gap: .75rem; align-items: center;">
+          <div class="row">
+            <span id="s-dot" class="dot"></span>
+            <strong>Status:</strong>&nbsp;<span id="s-text">unknown</span>
+            <span class="pill" data-tip="Docker container name running the Minecraft server">Container: <span id="s-name" class="mono">—</span></span>
+            <span class="pill" data-tip="Active player list reported via RCON">Players: <span id="s-players">—</span></span>
+            <span class="pill" data-tip="Last time a stop-and-push occurred">Last backup: <span id="last-backup">—</span></span>
+          </div>
+          <div class="btns">
+            <button onclick="doCall('start','POST')">Start</button>
+            <button onclick="doCall('restart','POST')">Restart</button>
+            <button class="btn-danger" onclick="doCall('stop','POST')">Stop (empty)</button>
+            <button class="btn-accent" onclick="doCall('status')">Refresh</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" style="display:flex; flex-direction: column; height: min(72vh, 900px);">
+        <div id="chatHistory" class="log" style="flex:1; overflow: auto; white-space: normal; background:#060a1a"></div>
+        <div class="row" style="margin-top:.75rem">
+          <input id="chatInput" class="mono" placeholder="Type a message to players and press Enter" style="flex:1; padding:.6rem; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:var(--text)"/>
+          <button class="btn-accent" onclick="sendChat()">Send</button>
+        </div>
+        <div class="log" id="log" style="margin-top:.5rem; min-height: 56px;">Ready.</div>
+      </section>
+    </div>
+  <div class="toasts" id="toasts"></div>
+
+    <script>
+      // Hard-coded (replaced by workflow)
+      const API_BASE = "%%API_BASE%%";
+      const API_TOKEN = "%%API_TOKEN%%";
+
+      const sDot = document.getElementById('s-dot');
+      const sText = document.getElementById('s-text');
+      const sName = document.getElementById('s-name');
+      const sPlayers = document.getElementById('s-players');
+      const lastBackupEl = document.getElementById('last-backup');
+      const chatInput = document.getElementById('chatInput');
+      const chatHistory = document.getElementById('chatHistory');
+      const log = document.getElementById('log');
+
+      function setStatus(status){
+        sText.textContent = status || 'unknown';
+        sDot.classList.remove('ok','err');
+        if(status === 'running'){ sDot.classList.add('ok'); }
+        else if(status === 'exited' || status === 'not-found' || status === 'not-created'){ sDot.classList.add('err'); }
+      }
+      function setLog(text){ log.textContent = text; }
+
+      function toast(msg, type = 'info', timeout = 3500){
+        const host = document.getElementById('toasts');
+        if(!host) return;
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.textContent = msg;
+        host.appendChild(el);
+        const t = setTimeout(()=>{
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(6px)';
+          setTimeout(()=>{ if(el.parentNode) host.removeChild(el); }, 250);
+        }, timeout);
+        el.addEventListener('click', ()=>{ clearTimeout(t); if(el.parentNode) host.removeChild(el); });
+      }
+
+      async function doCall(path, method='GET'){
+        const base = (API_BASE || '').replace(/\/$/, '');
+        if(!base || !API_TOKEN){ setLog('Configure API base and token.'); return; }
+        try{
+          const res = await fetch(`${base}/${path}`, { method, headers: { 'Authorization': `Bearer ${API_TOKEN}` }});
+          const raw = await res.text();
+          let parsed = null; try { parsed = JSON.parse(raw); } catch {}
+          if(!res.ok){
+            const msg = parsed?.detail || parsed?.message || `${res.status} ${res.statusText}`;
+            setLog(raw);
+            toast(msg, 'error');
+          } else {
+            setLog(`${res.status} ${res.statusText}\n` + raw);
+          }
+          if(path==='status' && res.ok){
+            try{ const data = parsed ?? JSON.parse(raw);
+              setStatus(data?.container?.status);
+              sName.textContent = data?.container?.name || '—';
+              const players = data?.players || [];
+              sPlayers.textContent = players.length ? players.join(', ') : 'none';
+              if(data?.last_backup){
+                const d = new Date(data.last_backup * 1000);
+                lastBackupEl.textContent = d.toLocaleString();
+              } else { lastBackupEl.textContent = 'never'; }
+            }catch(e){ /* ignore */ }
+          } else if(['start','restart','stop'].includes(path)){
+            await doCall('status');
+          }
+        }catch(e){ setLog('Error: ' + e); toast(String(e), 'error'); }
+      }
+
+      async function loadChat(){
+        const base = (API_BASE || '').replace(/\/$/, '');
+        if(!base || !API_TOKEN){ return; }
+        try{
+          const res = await fetch(`${base}/chat/history?lines=400`, { headers: { 'Authorization': `Bearer ${API_TOKEN}` } });
+          const data = await res.json();
+          renderChat(data?.messages||[]);
+        }catch(e){ /* ignore */ }
+      }
+
+      function renderChat(items){
+        chatHistory.innerHTML = '';
+        for(const m of items){
+          const row = document.createElement('div');
+          row.style.margin = '.15rem 0';
+          row.innerHTML = `<span class="pill" style="margin-right:.35rem">${m.ts || ''}</span><strong>${escapeHtml(m.user)}</strong>: ${escapeHtml(m.text)}`;
+          chatHistory.appendChild(row);
+        }
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+
+      function escapeHtml(s){
+        return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+      }
+
+      chatInput.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          sendChat();
+        }
+      });
+
+      async function sendChat(){
+        const v = (chatInput.value||'').trim();
+        if(!v){ setLog('Type a message first'); return; }
+        try{
+          const res = await fetch(`${API_BASE.replace(/\/$/, '')}/chat`, { method: 'POST', headers: { 'Authorization': `Bearer ${API_TOKEN}`, 'Content-Type':'application/json' }, body: JSON.stringify({ message: v }) });
+          const raw = await res.text();
+          let parsed = null; try { parsed = JSON.parse(raw); } catch {}
+          if(!res.ok){
+            const msg = parsed?.detail || parsed?.message || `${res.status} ${res.statusText}`;
+            toast(msg, 'error');
+            setLog(raw);
+            return;
+          }
+          toast('Message sent', 'success');
+          setLog(`${res.status} ${res.statusText}\n` + raw);
+          chatInput.value='';
+          loadChat();
+        }catch(e){ setLog('Error: ' + e); toast(String(e), 'error'); }
+      }
+
+      // initial loads and polling
+      doCall('status');
+      loadChat();
+      setInterval(loadChat, 4000);
+      setInterval(()=>doCall('status'), 10000);
+    </script>
+  </body>
+</html>

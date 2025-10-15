@@ -1,0 +1,7 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic-settings==2.5.2
+pydantic==2.9.2
+docker==7.1.0
+mcrcon==0.7.0
+python-dotenv==1.0.1

@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  control-api:
+    build: ./control-api
+    container_name: mc-control-api
+    env_file: ./.env
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      # Access to Docker daemon to manage the minecraft container
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount the same data dir so control-api can sync repo contents and adjust files
+      - ${MC_DATA_DIR:-/opt/minecraft/data}:/data:rw
+    restart: unless-stopped
+
+  # Define the minecraft service for network DNS and optional orchestration,
+  # but don't start it by default. You can start only control-api first.
+  mc:
+    image: ${MC_IMAGE:-itzg/minecraft-server:latest}
+    container_name: ${MC_CONTAINER_NAME:-mc-server}
+    environment:
+      EULA: "${EULA:-TRUE}"
+      MEMORY: "${MEMORY:-2G}"
+      TYPE: "${TYPE:-PAPER}"
+      VERSION: "${VERSION:-LATEST}"
+      ENABLE_RCON: "${ENABLE_RCON:-true}"
+      RCON_PASSWORD: "${RCON_PASSWORD:-changeme}"
+      RCON_PORT: "${RCON_PORT:-25575}"
+      # Optional: enable query for server list pings
+      ENABLE_QUERY: "${ENABLE_QUERY:-true}"
+      # Optional: ops list (comma separated Minecraft usernames)
+      OPS: "${OPS:-}"
+    ports:
+      - "${SERVER_PORT:-25565}:25565/tcp"
+      - "${SERVER_PORT:-25565}:25565/udp"
+      # Expose RCON only to the internal compose network, not to the host
+      # so the control-api can reach it without public exposure.
+      # If you need host access for debugging, map it to 127.0.0.1:25575 instead.
+      # - "127.0.0.1:${RCON_PORT:-25575}:25575"
+    volumes:
+      - ${MC_DATA_DIR:-/opt/minecraft/data}:/data:rw
+    networks:
+      - default
+    restart: unless-stopped
+    # By default, docker compose up -d will start this too. To keep it stopped
+    # initially, start only control-api: `docker compose up -d control-api`
+
+networks:
+  default:
+    name: mcnet
