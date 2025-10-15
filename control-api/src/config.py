@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # API
-    api_port: int = Field(default=8080)
+    api_port: int = Field(default=15277)
     api_token: str = Field(default="change-me-token", description="Bearer token for API auth")
     cors_origin: str = Field(default="*", description="Allowed CORS origin, e.g. https://<user>.github.io")
 

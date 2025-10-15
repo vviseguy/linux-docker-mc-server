@@ -1,12 +1,25 @@
 version: "3.9"
 
 services:
+  caddy:
+    image: caddy:2
+    container_name: mc-proxy
+    ports:
+      - "${API_PORT:-15277}:15277"
+    volumes:
+      # Use the single-port 15277 HTTPS config; switch back to Caddyfile for 80/443
+      - ./reverse-proxy/Caddyfile.15277:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - control-api
+    restart: unless-stopped
+
   control-api:
     build: ./control-api
     container_name: mc-control-api
     env_file: ./.env
-    ports:
-      - "${API_PORT:-8080}:8080"
+    # No host port: only accessible via the proxy
     volumes:
       # Access to Docker daemon to manage the minecraft container
       - /var/run/docker.sock:/var/run/docker.sock
@@ -49,3 +62,7 @@ services:
 networks:
   default:
     name: mcnet
+
+volumes:
+  caddy-data:
+  caddy-config:

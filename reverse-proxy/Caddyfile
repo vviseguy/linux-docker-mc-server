@@ -1,0 +1,20 @@
+# Replace api.example.com with your real DNS name pointing to the server's public IP
+api.example.com {
+  encode zstd gzip
+
+  # Forward all requests to the control API service in the compose network
+  reverse_proxy control-api:15277
+
+  # Optional: tighten timeouts (defaults are fine for this API)
+  # transport http {
+  #   read_timeout  30s
+  #   write_timeout 30s
+  # }
+
+  # CORS is already handled by FastAPI; you can add extra headers here if desired
+  # header {
+  #   Access-Control-Allow-Origin "https://youruser.github.io"
+  #   Access-Control-Allow-Headers "Authorization, Content-Type"
+  #   Access-Control-Allow-Methods "GET, POST, OPTIONS"
+  # }
+}

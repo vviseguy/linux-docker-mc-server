@@ -25,13 +25,13 @@ If `TYPE=CUSTOM`, the image runs the jar file you specify via `CUSTOM_SERVER` (w
 ## Topology
 
 - Internet -> your DNS (A record) -> Linux host public IP
-- Open ports: 25565 (MC), 8080 (control API)
+- Open ports: 25565 (MC), 15277 (control API)
 - GitHub Pages calls the control API with a bearer token
 
 ## Prerequisites on Linux host
 
 - Docker and Docker Compose installed
-- Public IP or port-forwarding from your router for TCP/UDP 25565 and TCP 8080
+- Public IP or port-forwarding from your router for TCP/UDP 25565 and TCP 15277
 - A data directory (e.g., `/opt/minecraft/data`) with enough disk space
 
 ## Setup
@@ -74,7 +74,7 @@ docker compose up -d control-api
 4. Start Minecraft via API:
 
 ```bash
-curl -H "Authorization: Bearer $API_TOKEN" http://localhost:8080/start
+curl -H "Authorization: Bearer $API_TOKEN" http://localhost:15277/start
 ```
 
 The control API will create/start the container with your `.env` configuration and mount `/opt/minecraft/data`.
@@ -96,25 +96,25 @@ Auth: `Authorization: Bearer <API_TOKEN>`
 Ensure your firewall and router allow:
 
 - TCP/UDP 25565 to your host
-- TCP 8080 to your host (or serve behind a reverse proxy and TLS)
+- TCP 15277 to your host (or serve behind a reverse proxy and TLS)
 
 Local tests on the Linux host:
 
 ```bash
 # API health
-curl http://localhost:8080/healthz
+curl http://localhost:15277/healthz
 # API status (requires token)
-curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8080/status
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:15277/status
 
 # Check port listeners
-ss -tulpen | grep -E ":(25565|8080)\b"
+ss -tulpen | grep -E ":(25565|15277)\b"
 ```
 
 Remote tests (from another machine):
 
 ```bash
 # Control API
-curl -H "Authorization: Bearer YOUR_TOKEN" http://YOUR_HOST_OR_DOMAIN:8080/status
+curl -H "Authorization: Bearer YOUR_TOKEN" http://YOUR_HOST_OR_DOMAIN:15277/status
 # Minecraft SRV (TCP)
 nc -zv YOUR_HOST_OR_DOMAIN 25565
 ```
@@ -123,7 +123,7 @@ nc -zv YOUR_HOST_OR_DOMAIN 25565
 
 Use `web/index.html` as a simple static page. Host it on GitHub Pages and set:
 
-- API base: `https://your-domain:8080` (or your reverse-proxied HTTPS URL)
+- API base: `https://your-domain:15277` (or your reverse-proxied HTTPS URL)
 - API token: your token
 
 In `.env`, set `CORS_ORIGIN=https://youruser.github.io` so browsers can call your API.
