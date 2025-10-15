@@ -7,10 +7,12 @@ services:
     ports:
       - "${API_PORT:-15277}:15277"
     volumes:
-      # Use the single-port 15277 HTTPS config; switch back to Caddyfile for 80/443
+      # HTTPS config (switch back to Caddyfile for domain-based 443)
       - ./reverse-proxy/Caddyfile.15277:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+      # Serve static web UI from ./web inside the container
+      - ./web:/srv/www:ro
     depends_on:
       - control-api
     restart: unless-stopped

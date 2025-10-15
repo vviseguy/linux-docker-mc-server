@@ -2,8 +2,14 @@
 api.example.com {
   encode zstd gzip
 
-  # Forward all requests to the control API service in the compose network
-  reverse_proxy control-api:15277
+  # Serve the static web UI from /srv/www (mounted from ./web)
+  root * /srv/www
+  file_server
+
+  # Proxy API requests to the FastAPI service
+  handle_path /api/* {
+    reverse_proxy control-api:15277
+  }
 
   # Optional: tighten timeouts (defaults are fine for this API)
   # transport http {
@@ -11,7 +17,7 @@ api.example.com {
   #   write_timeout 30s
   # }
 
-  # CORS is already handled by FastAPI; you can add extra headers here if desired
+  # CORS is handled by FastAPI; you can add extra headers here if desired
   # header {
   #   Access-Control-Allow-Origin "https://youruser.github.io"
   #   Access-Control-Allow-Headers "Authorization, Content-Type"
