@@ -150,6 +150,10 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     command: list[str] | None = None
     env = {"EULA": "TRUE"}
     ports = {server_port: server_port, cfg.rcon.port: cfg.rcon.port}
+    # Always compute flags list for response consistency
+    flags: list[str] = (
+        (body.extra_jvm_flags or []) if body.extra_jvm_flags is not None else (cfg.extra_jvm_flags or [])
+    )
     if body.use_itzg:
         # itzg image expects envs; mount /data to server root
         env.update(
@@ -168,9 +172,7 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     else:
         xms = f"-Xms{xms_val}G"
         xmx = f"-Xmx{xmx_val}G"
-        flags = [xms, xmx] + (
-            (body.extra_jvm_flags or []) if body.extra_jvm_flags is not None else (cfg.extra_jvm_flags or [])
-        )
+        flags = [xms, xmx] + flags
         # Use 'nogui' (without dashes) for compatibility with some Fabric setups
         command = ["java", *flags, "-jar", jar.name, "nogui"]
 

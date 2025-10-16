@@ -57,6 +57,8 @@ export default function App() {
     const inputRef = React.useRef<HTMLInputElement | null>(null)
     const [xms, setXms] = React.useState(2)
     const [xmx, setXmx] = React.useState(4)
+    const [javaVersion, setJavaVersion] = React.useState<number | ''>('')
+    const [useItzg, setUseItzg] = React.useState(false)
     const [adminToken, setAdminToken] = React.useState<string>(() => localStorage.getItem('adminToken') || '')
     const [status, setStatus] = React.useState<Status | null>(null)
     const [players, setPlayers] = React.useState<string[]>([])
@@ -67,7 +69,8 @@ export default function App() {
     const start = async () => {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (adminToken) headers['X-Admin-Token'] = adminToken
-        const body: any = { xms_gb: xms, xmx_gb: xmx }
+    const body: any = { xms_gb: xms, xmx_gb: xmx, use_itzg: useItzg }
+    if (!useItzg && javaVersion) body.java_version = javaVersion
         if (selectedServer) body.server_name = selectedServer
         const res = await fetch('/api/server/start', { method: 'POST', headers, body: JSON.stringify(body) })
         if (!res.ok) {
@@ -80,8 +83,9 @@ export default function App() {
             return
         }
         const data = await res.json()
+        const cmd = Array.isArray(data.command) ? data.command.join(' ') : '(itzg-managed)'
         toast.message('Starting server', {
-            description: `Image: ${data.java_image}\nCmd: ${data.command.join(' ')}\nPorts: ${Object.keys(data.ports).join(', ')}`,
+            description: `Image: ${data.java_image}\nCmd: ${cmd}\nPorts: ${Object.keys(data.ports).join(', ')}`,
         })
     }
     const stop = async () => {
@@ -244,13 +248,24 @@ export default function App() {
                                 <label title="Maximum heap size (Xmx)">Xmx (GB)
                                     <input className="input" type="number" min={1} max={64} value={xmx} onChange={(e: any) => setXmx(Number(e.target.value))} />
                                 </label>
+                                <label title="Select Java version for raw Java mode; itzg image manages Java automatically">
+                                    Java Version (raw)
+                                    <select className="input" value={javaVersion as any} onChange={(e) => setJavaVersion(e.target.value ? Number(e.target.value) : '')}>
+                                        <option value="">Default</option>
+                                        <option value="17">17</option>
+                                        <option value="21">21</option>
+                                    </select>
+                                </label>
+                                <label title="Use itzg/minecraft-server image to run the selected server folder">
+                                    <input type="checkbox" checked={useItzg} onChange={(e) => setUseItzg(e.target.checked)} /> Use itzg image
+                                </label>
                                 <small>These values override backend config for this start.</small>
                                 <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
                                 <div>
                                     <div>Players ({players.length}): {players.join(', ') || '—'}</div>
                                     <div style={{ marginTop: 8 }}>
                                         <button
-                                            title="Manual save (flush and commit/push)"
+                                            title="Manual save"
                                             onClick={async () => {
                                                 const headers: Record<string, string> = {}
                                                 if (adminToken) headers['X-Admin-Token'] = adminToken
