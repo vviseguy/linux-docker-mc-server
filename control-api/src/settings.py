@@ -36,6 +36,7 @@ class AppConfig:
     xmx_gb: int = 4
     extra_jvm_flags: list[str] = field(default_factory=list)  # e.g., ["-XX:+UseG1GC"]
     git_enabled: bool = False
+    use_itzg_default: bool = False  # default behavior when use_itzg isn't specified on start
 
 
 class Settings:
@@ -92,6 +93,7 @@ class Settings:
             xmx_gb=int(data.get("xmx_gb", 4)),
             extra_jvm_flags=data.get("extra_jvm_flags", []),
             git_enabled=env_bool("GIT_ENABLED", bool(data.get("git_enabled", False))),
+            use_itzg_default=env_bool("USE_ITZG_DEFAULT", bool(data.get("use_itzg_default", False))),
         )
         return cfg
 

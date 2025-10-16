@@ -58,7 +58,10 @@ export default function App() {
     const [xms, setXms] = React.useState(2)
     const [xmx, setXmx] = React.useState(4)
     const [javaVersion, setJavaVersion] = React.useState<number | ''>('')
-    const [useItzg, setUseItzg] = React.useState(false)
+    const [useItzg, setUseItzg] = React.useState<boolean>(() => {
+        const v = localStorage.getItem('useItzg')
+        return v ? v === 'true' : false
+    })
     const [adminToken, setAdminToken] = React.useState<string>(() => localStorage.getItem('adminToken') || '')
     const [status, setStatus] = React.useState<Status | null>(null)
     const [players, setPlayers] = React.useState<string[]>([])
@@ -138,6 +141,11 @@ export default function App() {
                     setCfg(conf)
                     const list = Array.isArray(srv?.servers) ? srv.servers : []
                     setServers(list)
+                    // If itzg not set explicitly in localStorage, reflect backend default once on load
+                    if (localStorage.getItem('useItzg') === null && typeof conf?.use_itzg_default === 'boolean') {
+                        setUseItzg(conf.use_itzg_default)
+                        localStorage.setItem('useItzg', String(conf.use_itzg_default))
+                    }
                     // Initialize selection if empty and we have servers
                     if (!selectedServer && list.length > 0) {
                         setSelectedServer(list[0].name)
@@ -257,7 +265,7 @@ export default function App() {
                                     </select>
                                 </label>
                                 <label title="Use itzg/minecraft-server image to run the selected server folder">
-                                    <input type="checkbox" checked={useItzg} onChange={(e) => setUseItzg(e.target.checked)} /> Use itzg image
+                                    <input type="checkbox" checked={useItzg} onChange={(e) => { setUseItzg(e.target.checked); localStorage.setItem('useItzg', String(e.target.checked)) }} /> Use itzg image
                                 </label>
                                 <small>These values override backend config for this start.</small>
                                 <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />

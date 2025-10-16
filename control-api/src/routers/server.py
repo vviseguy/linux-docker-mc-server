@@ -154,7 +154,14 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     flags: list[str] = (
         (body.extra_jvm_flags or []) if body.extra_jvm_flags is not None else (cfg.extra_jvm_flags or [])
     )
-    if body.use_itzg:
+    # Decide whether to use itzg: explicit flag wins; otherwise config default or detect jar type
+    use_itzg = bool(body.use_itzg) if body.use_itzg is not None else settings.config.use_itzg_default
+    # Heuristic: if jar name indicates Fabric/Forge/Quilt and user hasn't forced raw, prefer itzg
+    lower_jar = jar.name.lower()
+    if body.use_itzg is None and any(k in lower_jar for k in ("fabric", "forge", "quilt")):
+        use_itzg = True
+
+    if use_itzg:
         # itzg image expects envs; mount /data to server root
         env.update(
             {
@@ -179,7 +186,7 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     dm = DockerManager()
     # Stop any existing container first
     dm.stop_container(cfg.mc_container_name)
-    if body.use_itzg:
+    if use_itzg:
         container = dm.start_itzg_container(
             name=cfg.mc_container_name,
             server_host_dir=server_root,
@@ -208,6 +215,7 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
         "session_branch": session_branch,
         "java_image": java_image,
         "command": command,
+        "use_itzg": use_itzg,
         "ports": ports,
         "xms_gb": xms_val,
         "xmx_gb": xmx_val,

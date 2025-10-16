@@ -16,4 +16,5 @@ def get_config():
             "host": cfg.rcon.host,
         },
         "sync_interval_seconds": cfg.sync_interval_seconds,
+        "use_itzg_default": cfg.use_itzg_default,
     }
