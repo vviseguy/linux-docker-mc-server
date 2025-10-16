@@ -165,7 +165,7 @@ export default function App() {
                 </div>
             </header>
 
-            <main className="grid grid-cols" style={{ padding: 12 }}>
+            <main className="grid grid-cols" style={{ padding: 12, alignItems: 'stretch' }}>
                 <section className="panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <div className="panel-title">Chat</div>
                     <div className="panel-body chat">
@@ -183,7 +183,7 @@ export default function App() {
                         </div>
                     </div>
                 </section>
-                <aside className="panel" style={{ position: 'relative', transition: 'width .25s ease' }}>
+                <aside className="panel sidebar" style={{ position: 'relative' }}>
                     <div className="panel-title">
                         <span className="title-text">Controls & Info</span>
                         <button
@@ -193,7 +193,14 @@ export default function App() {
                                 const body = root.querySelector('.slide-content') as HTMLElement
                                 const collapsed = body.classList.toggle('collapsed')
                                 root.classList.toggle('collapsed', collapsed)
-                                root.style.width = collapsed ? '44px' : ''
+                                const caret = e.currentTarget.querySelector('.caret-icon') as HTMLElement
+                                if (collapsed) {
+                                    root.style.width = '48px'
+                                    caret?.classList.add('caret-open')
+                                } else {
+                                    root.style.width = ''
+                                    caret?.classList.remove('caret-open')
+                                }
                             }}
                             aria-label="Toggle controls"
                         >
@@ -240,7 +247,7 @@ export default function App() {
                 </aside>
             </main>
 
-            <footer style={{ display: 'flex', gap: 8, padding: 8, borderTop: '1px solid #1f2937' }}>
+            <footer className="footer" style={{ display: 'flex', gap: 8, padding: 8 }}>
                 <input
                     placeholder="Type to chat or run /command"
                     value={input}

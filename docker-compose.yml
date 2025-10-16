@@ -5,8 +5,6 @@ services:
     build:
       context: ./control-api
     container_name: mc-control-api
-    env_file:
-      - .env
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
