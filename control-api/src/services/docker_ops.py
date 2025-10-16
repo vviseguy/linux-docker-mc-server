@@ -123,6 +123,33 @@ class DockerManager:
         )
         return container
 
+    def start_itzg_container(
+        self,
+        name: str,
+        server_host_dir: Path,
+        ports: dict[int, int],
+        env: dict[str, str] | None,
+        image: str = "itzg/minecraft-server:latest",
+    ):
+        self.ensure_image(image)
+        src_path = str(server_host_dir.resolve())
+        host_src = self._container_host_path_for(server_host_dir)
+        if host_src:
+            src_path = host_src
+        binds = {src_path: {"bind": "/data", "mode": "rw"}}
+        port_map = {f"{p}/tcp": p for p in ports.keys()}
+        container = self.client.containers.run(
+            image,
+            name=name,
+            detach=True,
+            volumes=binds,
+            ports=port_map,
+            environment=env or {},
+            stdin_open=True,
+            tty=True,
+        )
+        return container
+
     def stop_container(self, name: str, timeout: int = 10):
         try:
             c = self.client.containers.get(name)

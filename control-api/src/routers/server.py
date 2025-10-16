@@ -22,6 +22,7 @@ class StartRequest(BaseModel):
     java_version: int | None = None
     java_image: str | None = None
     server_name: str | None = None  # choose subfolder under data by normalized name
+    use_itzg: bool | None = None  # run with itzg/minecraft-server instead of raw java
 
 
 def _normalize_name(s: str) -> str:
@@ -104,7 +105,7 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     # Ensure RCON and EULA
     server_port = ensure_rcon_and_eula(server_root, cfg.rcon.port, cfg.rcon.password)
 
-    # Build java command manually to control memory and flags
+    # Build java command or prepare env for itzg image
     # Detect server jar from start scripts first
     start_sh = server_root / "start.sh"
     start_bat = server_root / "start.bat"
@@ -146,34 +147,57 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
 
     xms_val = body.xms_gb if body.xms_gb is not None else cfg.xms_gb
     xmx_val = body.xmx_gb if body.xmx_gb is not None else cfg.xmx_gb
-    xms = f"-Xms{xms_val}G"
-    xmx = f"-Xmx{xmx_val}G"
-    flags = [xms, xmx] + (
-        (body.extra_jvm_flags or []) if body.extra_jvm_flags is not None else (cfg.extra_jvm_flags or [])
-    )
-    # Use 'nogui' (without dashes) for compatibility with some Fabric setups
-    command = ["java", *flags, "-jar", jar.name, "nogui"]
-
-    env = {
-        "EULA": "TRUE",
-    }
-
+    command: list[str] | None = None
+    env = {"EULA": "TRUE"}
     ports = {server_port: server_port, cfg.rcon.port: cfg.rcon.port}
+    if body.use_itzg:
+        # itzg image expects envs; mount /data to server root
+        env.update(
+            {
+                "EULA": "TRUE",
+                "MEMORY": f"{xmx_val}G",
+                "INIT_MEMORY": f"{xms_val}G",
+                # If a jar file is present, SERVER=custom will run it with the given JAR
+                "TYPE": "CUSTOM",
+                "CUSTOM_SERVER": jar.name,
+                "RCON_PASSWORD": cfg.rcon.password,
+                "RCON_PORT": str(cfg.rcon.port),
+                "ENABLE_RCON": "true",
+            }
+        )
+    else:
+        xms = f"-Xms{xms_val}G"
+        xmx = f"-Xmx{xmx_val}G"
+        flags = [xms, xmx] + (
+            (body.extra_jvm_flags or []) if body.extra_jvm_flags is not None else (cfg.extra_jvm_flags or [])
+        )
+        # Use 'nogui' (without dashes) for compatibility with some Fabric setups
+        command = ["java", *flags, "-jar", jar.name, "nogui"]
 
     dm = DockerManager()
     # Stop any existing container first
     dm.stop_container(cfg.mc_container_name)
-    desired_java_version = body.java_version if body.java_version is not None else cfg.java_version
-    java_image = body.java_image or cfg.java_image or default_java_image(desired_java_version)
-    container = dm.start_container(
-        name=cfg.mc_container_name,
-        repo_host_dir=server_root,
-        ports=ports,
-        env=env,
-        command=command,
-        java_image=java_image,
-        workdir="/data",
-    )
+    if body.use_itzg:
+        container = dm.start_itzg_container(
+            name=cfg.mc_container_name,
+            server_host_dir=server_root,
+            ports=ports,
+            env=env,
+        )
+        java_image = "itzg/minecraft-server:latest"
+        command = None
+    else:
+        desired_java_version = body.java_version if body.java_version is not None else cfg.java_version
+        java_image = body.java_image or cfg.java_image or default_java_image(desired_java_version)
+        container = dm.start_container(
+            name=cfg.mc_container_name,
+            repo_host_dir=server_root,
+            ports=ports,
+            env=env,
+            command=command or [],
+            java_image=java_image,
+            workdir="/data",
+        )
     # server starting, not yet online until logs show 'Done (...)'
     runtime.online = False
     return {
