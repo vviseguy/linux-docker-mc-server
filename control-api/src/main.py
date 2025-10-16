@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+import os
 from .settings import settings
 from .routers import server, chat, config as cfg
 from .scheduler import start_scheduler, shutdown_scheduler
@@ -32,3 +35,28 @@ def _on_startup():
 @app.on_event("shutdown")
 def _on_shutdown():
     shutdown_scheduler()
+
+
+# Optionally serve the built SPA if present
+def _mount_spa_if_present(_app: FastAPI):
+    # Prefer explicit env var if provided (e.g., set SPA_DIR=/app/www in container)
+    candidates: list[Path] = []
+    spa_env = os.getenv("SPA_DIR")
+    if spa_env:
+        candidates.append(Path(spa_env))
+    # Common dev path: project/web/dist (when running locally)
+    candidates.append((settings.root.parent / "web" / "dist").resolve())
+    # Common container path where compose can mount the build output
+    candidates.append(Path("/app/www"))
+
+    for p in candidates:
+        try:
+            if p.exists() and (p / "index.html").exists():
+                # Mount at root; API remains at /api/* because routers are registered first
+                _app.mount("/", StaticFiles(directory=str(p), html=True), name="spa")
+                break
+        except Exception:
+            continue
+
+
+_mount_spa_if_present(app)

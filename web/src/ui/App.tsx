@@ -1,5 +1,5 @@
 import React from 'react'
-import { Toaster, toast } from 'sonner'
+import { toast } from 'sonner'
 import { Play, Square, RotateCcw } from 'lucide-react'
 import './styles.css'
 
@@ -140,7 +140,6 @@ export default function App() {
 
     return (
         <div style={{ height: '100vh', display: 'grid', gridTemplateRows: '80px 1fr 56px', background: 'var(--bg2)', color: 'var(--text)' }}>
-            <Toaster richColors position="top-right" />
             <header className="header" style={{ padding: '0 16px', borderBottom: '1px solid var(--border)' }}>
                 <div className="header-row header-center"><h1 className="minecraft-title" style={{ fontSize: 18 }}>Minecraft Dashboard</h1></div>
                 <div className="header-row" style={{ justifyContent: 'space-between' }}>
