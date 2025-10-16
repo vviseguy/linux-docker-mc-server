@@ -44,7 +44,7 @@ function useChat() {
     return { messages, connect, send, disconnect }
 }
 
-type Status = { running: boolean; online: boolean; status?: string; docker_available?: boolean }
+type Status = { running: boolean; online: boolean; status?: string; docker_available?: boolean; agent_available?: boolean }
 
 function Badge({ label, kind }: { label: string; kind: 'ok' | 'warn' | 'err' | undefined }) {
     const cls = kind ? `badge ${kind}` : 'badge'
@@ -133,6 +133,7 @@ export default function App() {
     }, [])
 
     const dockerOk = status?.docker_available
+    const agentOk = status?.agent_available
     const running = !!status?.running
     const online = !!status?.online
     const statusLabel = online ? 'Online' : (running ? 'Starting...' : (status?.status ?? 'Stopped'))
@@ -146,6 +147,7 @@ export default function App() {
                     <div className="row" style={{ gap: 10 }}>
                         <Badge label={`Status: ${statusLabel}`} kind={statusKind} />
                         <Badge label={dockerOk ? 'Docker: ready' : 'Docker: unavailable'} kind={dockerOk ? 'ok' : 'err'} />
+                        <Badge label={agentOk ? 'Agent: ready' : 'Agent: not found'} kind={agentOk ? 'ok' : 'warn'} />
                         <div>Players: {players.length}</div>
                     </div>
                     <div className="row" style={{ gap: 8 }}>

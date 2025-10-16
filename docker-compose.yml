@@ -5,12 +5,19 @@ services:
     build:
       context: ./control-api
     container_name: mc-control-api
+    # Load environment variables from .env (e.g., ADMIN_TOKEN, GIT_USERNAME, GIT_TOKEN)
+    env_file:
+      - .env
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - /var/run/docker.sock:/var/run/docker.sock
       # Optional: mount built SPA so API can serve it (run npm run build in web first)
       - ./web/dist:/app/www:ro
+      # Optional: Use host SSH agent and git config for SSH-based Git auth (Linux)
+      # - ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}
+      # - ~/.gitconfig:/root/.gitconfig:ro
+      # - ~/.ssh:/root/.ssh:ro
     ports:
       - "8080:8080"
     extra_hosts:

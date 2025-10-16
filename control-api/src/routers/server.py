@@ -218,12 +218,22 @@ def status():
         docker_available = False
     from ..state import runtime
 
+    # Detect host-side git agent (via control folder created by host_git_agent.py)
+    try:
+        from ..settings import settings as _settings
+
+        data_dir = _settings.root / cfg.repo.path
+        agent_available = (data_dir / ".ctl" / "requests").exists()
+    except Exception:
+        agent_available = False
+
     return {
         "running": st == "running",
         "online": runtime.online,
         "container": cfg.mc_container_name,
         "status": st,
         "docker_available": docker_available,
+        "agent_available": agent_available,
     }
 
 
