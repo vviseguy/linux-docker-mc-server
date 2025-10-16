@@ -44,7 +44,7 @@ function useChat() {
     return { messages, connect, send, disconnect }
 }
 
-type Status = { running: boolean; online: boolean; status?: string; docker_available?: boolean; agent_available?: boolean }
+type Status = { running: boolean; online: boolean; status?: string; docker_available?: boolean }
 
 function Badge({ label, kind }: { label: string; kind: 'ok' | 'warn' | 'err' | undefined }) {
     const cls = kind ? `badge ${kind}` : 'badge'
@@ -61,13 +61,22 @@ export default function App() {
     const [status, setStatus] = React.useState<Status | null>(null)
     const [players, setPlayers] = React.useState<string[]>([])
     const [cfg, setCfg] = React.useState<any>(null)
+    const [servers, setServers] = React.useState<Array<{ name: string; normalized: string; path: string }>>([])
+    const [selectedServer, setSelectedServer] = React.useState<string>('')
 
     const start = async () => {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (adminToken) headers['X-Admin-Token'] = adminToken
-        const res = await fetch('/api/server/start', { method: 'POST', headers, body: JSON.stringify({ xms_gb: xms, xmx_gb: xmx }) })
+        const body: any = { xms_gb: xms, xmx_gb: xmx }
+        if (selectedServer) body.server_name = selectedServer
+        const res = await fetch('/api/server/start', { method: 'POST', headers, body: JSON.stringify(body) })
         if (!res.ok) {
-            toast.error('Failed to start')
+            try {
+                const err = await res.json()
+                toast.error(err?.detail || `Failed to start (${res.status})`)
+            } catch {
+                toast.error(`Failed to start (${res.status})`)
+            }
             return
         }
         const data = await res.json()
@@ -113,15 +122,22 @@ export default function App() {
         let cancelled = false
         const tick = async () => {
             try {
-                const [st, info, conf] = await Promise.all([
+                const [st, info, conf, srv] = await Promise.all([
                     fetch('/api/server/status').then(r => r.json()),
                     fetch('/api/server/info').then(r => r.json()),
                     fetch('/api/config').then(r => r.json()),
+                    fetch('/api/server/servers').then(r => r.json()).catch(() => ({ servers: [] })),
                 ])
                 if (!cancelled) {
                     setStatus(st)
                     setPlayers(info.players ?? [])
                     setCfg(conf)
+                    const list = Array.isArray(srv?.servers) ? srv.servers : []
+                    setServers(list)
+                    // Initialize selection if empty and we have servers
+                    if (!selectedServer && list.length > 0) {
+                        setSelectedServer(list[0].name)
+                    }
                 }
             } catch {
                 // ignore
@@ -133,7 +149,6 @@ export default function App() {
     }, [])
 
     const dockerOk = status?.docker_available
-    const agentOk = status?.agent_available
     const running = !!status?.running
     const online = !!status?.online
     const statusLabel = online ? 'Online' : (running ? 'Starting...' : (status?.status ?? 'Stopped'))
@@ -147,7 +162,6 @@ export default function App() {
                     <div className="row" style={{ gap: 10 }}>
                         <Badge label={`Status: ${statusLabel}`} kind={statusKind} />
                         <Badge label={dockerOk ? 'Docker: ready' : 'Docker: unavailable'} kind={dockerOk ? 'ok' : 'err'} />
-                        <Badge label={agentOk ? 'Agent: ready' : 'Agent: not found'} kind={agentOk ? 'ok' : 'warn'} />
                         <div>Players: {players.length}</div>
                     </div>
                     <div className="row" style={{ gap: 8 }}>
@@ -211,6 +225,19 @@ export default function App() {
                     <div className="panel-body slide-wrap" style={{ fontSize: 14, color: 'var(--muted)' }}>
                         <div className="slide-content">
                             <div className="grid" style={{ gap: 8 }}>
+                                <label title="Select which server folder under data/ to run">
+                                    Server
+                                    <select
+                                        className="input"
+                                        value={selectedServer}
+                                        onChange={(e) => setSelectedServer(e.target.value)}
+                                    >
+                                        {servers.length === 0 && <option value="">Auto-detect</option>}
+                                        {servers.map(s => (
+                                            <option key={s.path} value={s.name}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                </label>
                                 <label title="Initial heap size (Xms)">Xms (GB)
                                     <input className="input" type="number" min={1} max={64} value={xms} onChange={(e: any) => setXms(Number(e.target.value))} />
                                 </label>
@@ -237,9 +264,7 @@ export default function App() {
                                 <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
                                 <div>
                                     <div style={{ fontWeight: 600, marginBottom: 4 }}>Config</div>
-                                    <div>Repo: {cfg?.repo?.url || '—'}</div>
-                                    <div>Branch: {cfg?.repo?.branch || '—'}</div>
-                                    <div>Path: {cfg?.repo?.path || '—'}</div>
+                                    <div>Data path: {cfg?.data_path ?? 'data'}</div>
                                     <div>RCON: {cfg?.rcon?.enable ? `${cfg?.rcon?.host}:${cfg?.rcon?.port}` : 'disabled'}</div>
                                 </div>
                             </div>

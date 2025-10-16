@@ -8,6 +8,8 @@ from ..services.rcon_bridge import list_players
 from ..utils.server_properties import ensure_rcon_and_eula
 from ..security import require_admin_token
 import os
+from typing import Optional
+import re
 
 router = APIRouter()
 
@@ -19,6 +21,40 @@ class StartRequest(BaseModel):
     extra_jvm_flags: list[str] | None = None
     java_version: int | None = None
     java_image: str | None = None
+    server_name: str | None = None  # choose subfolder under data by normalized name
+
+
+def _normalize_name(s: str) -> str:
+    # lower, remove all non-alphanumeric characters
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _is_runnable_dir(p: Path) -> bool:
+    return ((p / "start.sh").exists() or (p / "start.bat").exists() or any(p.glob("*.jar")))
+
+
+def _list_runnable_servers(base: Path) -> list[dict]:
+    items: list[dict] = []
+    # Prefer subdirectories; include base if it is runnable too
+    for child in sorted([d for d in base.iterdir() if d.is_dir() and not d.name.startswith('.')]):
+        if _is_runnable_dir(child):
+            items.append({
+                "name": child.name,
+                "normalized": _normalize_name(child.name),
+                "path": str(child.relative_to(base))
+            })
+    if _is_runnable_dir(base):
+        items.insert(0, {"name": "root", "normalized": _normalize_name("root"), "path": "."})
+    return items
+
+
+@router.get("/servers")
+def list_servers():
+    cfg = settings.config
+    from ..settings import settings as _settings
+    base = (_settings.root / cfg.repo.path)
+    base.mkdir(parents=True, exist_ok=True)
+    return {"servers": _list_runnable_servers(base)}
 
 
 @router.post("/start")
@@ -31,16 +67,42 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
 
     data_dir = _settings.root / cfg.repo.path
     data_dir.mkdir(parents=True, exist_ok=True)
+
+    # Detect server root: either data_dir itself or a nested subfolder containing a server jar/start script
+    def find_server_root(base: Path) -> Path:
+        # If base has start script or jar, use it
+        if (base / "start.sh").exists() or (base / "start.bat").exists() or list(base.glob("*.jar")):
+            return base
+        # Look one level down for a folder with jar or start script
+        for child in sorted([p for p in base.iterdir() if p.is_dir()]):
+            if child.name.startswith('.'):
+                continue
+            if (child / "start.sh").exists() or (child / "start.bat").exists() or list(child.glob("*.jar")):
+                return child
+        return base
+
+    # If a server_name is provided, match it to a subfolder (normalized)
+    if body.server_name:
+        wanted = _normalize_name(body.server_name)
+        candidates = _list_runnable_servers(data_dir)
+        match = next((c for c in candidates if c["normalized"] == wanted), None)
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Server '{body.server_name}' not found. Available: {', '.join([c['name'] for c in candidates])}")
+        server_root = (data_dir / match["path"]).resolve()
+        if not _is_runnable_dir(server_root):
+            raise HTTPException(status_code=400, detail=f"Selected folder '{match['name']}' is not runnable (no jar or start script)")
+    else:
+        server_root = find_server_root(data_dir)
     session_branch = None
     runtime.session_branch = None
 
     # Ensure RCON and EULA
-    server_port = ensure_rcon_and_eula(data_dir, cfg.rcon.port, cfg.rcon.password)
+    server_port = ensure_rcon_and_eula(server_root, cfg.rcon.port, cfg.rcon.password)
 
     # Build java command manually to control memory and flags
     # Detect server jar from start scripts first
-    start_sh = data_dir / "start.sh"
-    start_bat = data_dir / "start.bat"
+    start_sh = server_root / "start.sh"
+    start_bat = server_root / "start.bat"
     detected_jar_name: str | None = None
     cmd_from_sh = parse_start_sh(start_sh)
     cmd_from_bat = parse_start_bat(start_bat) if not cmd_from_sh else None
@@ -58,10 +120,10 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
                 detected_jar_name = None
 
     # Fallback: prefer paper/purpur/pufferfish/spigot/server, else largest *.jar
-    jars = sorted([p for p in data_dir.glob("*.jar")], key=lambda p: (-p.stat().st_size, p.name))
+    jars = sorted([p for p in server_root.glob("*.jar")], key=lambda p: (-p.stat().st_size, p.name))
     jar = None
     if detected_jar_name:
-        candidate = data_dir / detected_jar_name
+        candidate = server_root / detected_jar_name
         if candidate.exists():
             jar = candidate
     if not jar:
@@ -99,7 +161,7 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     java_image = body.java_image or cfg.java_image or default_java_image(desired_java_version)
     container = dm.start_container(
         name=cfg.mc_container_name,
-        repo_host_dir=data_dir,
+        repo_host_dir=server_root,
         ports=ports,
         env=env,
         command=command,
