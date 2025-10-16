@@ -5,12 +5,9 @@ services:
     image: caddy:2
     container_name: mc-proxy
     ports:
-      - "${API_PORT:-15277}:15277"
+      - "${API_PORT:-8080}:8080"
     volumes:
-      # HTTPS config (switch back to Caddyfile for domain-based 443)
-      - ./reverse-proxy/Caddyfile.15277:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
+      - ./reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
       # Serve static web UI from ./web inside the container
       - ./web:/srv/www:ro
     depends_on:
@@ -64,7 +61,3 @@ services:
 networks:
   default:
     name: mcnet
-
-volumes:
-  caddy-data:
-  caddy-config:
