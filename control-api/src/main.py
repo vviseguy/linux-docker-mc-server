@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -217,3 +218,12 @@ def git_pull():
 def git_push():
     out = git.commit_and_push("Manual push")
     return {"ok": True, "output": out}
+
+
+# Serve the static web UI from /srv/www (mounted via docker-compose)
+# Add this last so API routes above take precedence.
+try:
+    app.mount("/", StaticFiles(directory="/srv/www", html=True), name="static")
+except Exception:
+    # If the directory isn't present (e.g., in dev), skip mounting.
+    pass
