@@ -163,19 +163,29 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
 
     if use_itzg:
         # itzg image expects envs; mount /data to server root
+        # Choose TYPE based on detected jar name; use CUSTOM fallback otherwise
+        detected_type = None
+        if "fabric" in lower_jar:
+            detected_type = "FABRIC"
+        elif "forge" in lower_jar:
+            detected_type = "FORGE"
+        elif "quilt" in lower_jar:
+            detected_type = "QUILT"
         env.update(
             {
                 "EULA": "TRUE",
                 "MEMORY": f"{xmx_val}G",
                 "INIT_MEMORY": f"{xms_val}G",
-                # If a jar file is present, SERVER=custom will run it with the given JAR
-                "TYPE": "CUSTOM",
-                "CUSTOM_SERVER": jar.name,
                 "RCON_PASSWORD": cfg.rcon.password,
                 "RCON_PORT": str(cfg.rcon.port),
                 "ENABLE_RCON": "true",
             }
         )
+        if detected_type:
+            env["TYPE"] = detected_type
+        else:
+            env["TYPE"] = "CUSTOM"
+            env["CUSTOM_SERVER"] = jar.name
     else:
         xms = f"-Xms{xms_val}G"
         xmx = f"-Xmx{xmx_val}G"
