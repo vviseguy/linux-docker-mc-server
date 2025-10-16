@@ -99,6 +99,7 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
         server_root = find_server_root(data_dir)
     session_branch = None
     runtime.session_branch = None
+    runtime.server_root = str(server_root)
 
     # Ensure RCON and EULA
     server_port = ensure_rcon_and_eula(server_root, cfg.rcon.port, cfg.rcon.password)
@@ -245,13 +246,30 @@ def status():
         docker_available = False
     from ..state import runtime
 
-    return {
+    info = {
         "running": st == "running",
         "online": runtime.online,
         "container": cfg.mc_container_name,
         "status": st,
         "docker_available": docker_available,
+        "server_root": runtime.server_root,
     }
+    # Optionally add container details when running
+    try:
+        if docker_available and st:
+            c = dm.client.containers.get(cfg.mc_container_name)
+            info.update(
+                {
+                    "image": c.image.tags,
+                    "command": c.attrs.get("Config", {}).get("Cmd"),
+                    "state": c.attrs.get("State"),
+                    "ports": c.attrs.get("HostConfig", {}).get("PortBindings"),
+                    "mounts": c.attrs.get("Mounts"),
+                }
+            )
+    except Exception:
+        pass
+    return info
 
 
 @router.get("/info")
