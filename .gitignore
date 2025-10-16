@@ -1,6 +1,5 @@
 # Dependencies and environments
 node_modules/
-dist/
 .venv/
 venv/
 __pycache__/

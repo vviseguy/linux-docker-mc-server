@@ -127,3 +127,54 @@ Security notes:
 - Only the specific actions above are allowed; arbitrary commands are not executed.
 
 This setup lets the container run the server while your host keeps private keys or PATs and performs authenticated git operations on behalf of the container.
+
+## Troubleshooting
+
+Clean up old containers and images (Docker)
+
+Common maintenance commands. Be careful with prune commands; they remove stopped containers/images/networks.
+
+List containers and stop/remove the dashboard and server containers:
+
+PowerShell (Windows):
+
+```powershell
+# List all containers
+docker ps -a
+
+# Stop the control API and the MC server container if present
+docker stop mc-control-api; docker stop mc-server
+
+# Remove them
+docker rm mc-control-api; docker rm mc-server
+
+# Remove any dangling/stopped containers (optional)
+docker container prune -f
+
+# List images and remove any you no longer need (optional)
+docker images
+# Example:
+# docker rmi <IMAGE_ID>
+
+# Remove unused images/networks (optional)
+docker image prune -a -f; docker network prune -f
+
+# If you used Docker volumes elsewhere and want to clean them (not required here as we bind-mount ./data and ./logs)
+docker volume ls
+docker volume prune -f
+```
+
+Compose-specific:
+
+```powershell
+# From the project root
+docker compose down
+
+# Rebuild and start fresh after changes
+docker compose up -d --build
+```
+
+Notes:
+
+- This project bind-mounts `./data` and `./logs`. The commands above do not delete those folders. Manage them with normal file operations if needed.
+- The MC server container is created dynamically by the API as `mc-server` (configurable via `mc_container_name`). The control API container is named `mc-control-api`.
