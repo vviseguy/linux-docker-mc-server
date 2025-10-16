@@ -1,13 +1,15 @@
 :15277 {
   encode zstd gzip
 
-  # Use Caddy's internal CA for TLS (self-signed). Browsers will show a warning
-  # unless you install the CA. For trusted certs without opening 80/443, use
-  # DNS-01 (requires provider plugin) or mount your own certs and use 'tls' below.
+  # Self-signed TLS on this port; install the CA on clients to avoid warnings
   tls internal
 
-  # If you have your own certs, comment 'tls internal' above and use:
-  # tls /certs/fullchain.pem /certs/privkey.pem
+  # Serve the static web UI from ./web mounted at /srv/www
+  root * /srv/www
+  file_server
 
-  reverse_proxy control-api:15277
+  # Proxy API requests under the same origin
+  handle_path /api/* {
+    reverse_proxy control-api:8080
+  }
 }

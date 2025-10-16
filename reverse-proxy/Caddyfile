@@ -8,7 +8,7 @@ api.example.com {
 
   # Proxy API requests to the FastAPI service
   handle_path /api/* {
-    reverse_proxy control-api:15277
+    reverse_proxy control-api:8080
   }
 
   # Optional: tighten timeouts (defaults are fine for this API)
