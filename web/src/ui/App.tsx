@@ -1,10 +1,12 @@
 import React from 'react'
 import { Toaster, toast } from 'sonner'
 import { Play, Square, RotateCcw } from 'lucide-react'
+import './styles.css'
 
 function useChat() {
     const [messages, setMessages] = React.useState<string[]>([])
     const wsRef = React.useRef<WebSocket | null>(null)
+    const connectedRef = React.useRef(false)
 
     const connect = React.useCallback(() => {
         const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/chat/ws`)
@@ -16,12 +18,22 @@ function useChat() {
             }
             setMessages((m) => [...m, text])
         }
-        ws.onopen = () => toast.success('Chat connected')
-        ws.onclose = () => toast.error('Chat disconnected')
+        ws.onopen = () => { connectedRef.current = true; toast.success('Chat connected') }
+        ws.onclose = () => { connectedRef.current = false; toast.error('Chat disconnected') }
     }, [])
 
     const send = React.useCallback((text: string) => {
-        wsRef.current?.send(text)
+        if (!text.trim()) return
+        if (!connectedRef.current) {
+            toast.error('Chat is not connected yet')
+            return
+        }
+        try {
+            wsRef.current?.send(text)
+            toast.success('Message sent')
+        } catch {
+            toast.error('Failed to send message')
+        }
     }, [])
 
     const disconnect = React.useCallback(() => {
@@ -32,14 +44,23 @@ function useChat() {
     return { messages, connect, send, disconnect }
 }
 
+type Status = { running: boolean; online: boolean; status?: string; docker_available?: boolean }
+
+function Badge({ label, kind }: { label: string; kind: 'ok' | 'warn' | 'err' | undefined }) {
+    const cls = kind ? `badge ${kind}` : 'badge'
+    return <span className={cls}>{label}</span>
+}
+
 export default function App() {
     const { messages, connect, send } = useChat()
     const [input, setInput] = React.useState('')
+    const inputRef = React.useRef<HTMLInputElement | null>(null)
     const [xms, setXms] = React.useState(2)
     const [xmx, setXmx] = React.useState(4)
     const [adminToken, setAdminToken] = React.useState<string>(() => localStorage.getItem('adminToken') || '')
-    const [status, setStatus] = React.useState<{ running: boolean; online: boolean; status?: string } | null>(null)
+    const [status, setStatus] = React.useState<Status | null>(null)
     const [players, setPlayers] = React.useState<string[]>([])
+    const [cfg, setCfg] = React.useState<any>(null)
 
     const start = async () => {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -82,19 +103,25 @@ export default function App() {
     React.useEffect(() => {
         connect()
     }, [connect])
+    React.useEffect(() => {
+        // focus input on load
+        inputRef.current?.focus()
+    }, [])
 
     // Poll server status and info
     React.useEffect(() => {
         let cancelled = false
         const tick = async () => {
             try {
-                const [st, info] = await Promise.all([
+                const [st, info, conf] = await Promise.all([
                     fetch('/api/server/status').then(r => r.json()),
                     fetch('/api/server/info').then(r => r.json()),
+                    fetch('/api/config').then(r => r.json()),
                 ])
                 if (!cancelled) {
                     setStatus(st)
                     setPlayers(info.players ?? [])
+                    setCfg(conf)
                 }
             } catch {
                 // ignore
@@ -105,63 +132,107 @@ export default function App() {
         return () => { cancelled = true; clearInterval(id) }
     }, [])
 
+    const dockerOk = status?.docker_available
+    const running = !!status?.running
+    const online = !!status?.online
+    const statusLabel = online ? 'Online' : (running ? 'Starting...' : (status?.status ?? 'Stopped'))
+    const statusKind: 'ok' | 'warn' | 'err' | undefined = online ? 'ok' : (running ? 'warn' : undefined)
+
     return (
-        <div style={{ height: '100vh', display: 'grid', gridTemplateRows: '56px 1fr 56px', background: '#0f172a', color: '#e2e8f0' }}>
+        <div style={{ height: '100vh', display: 'grid', gridTemplateRows: '80px 1fr 56px', background: 'var(--bg2)', color: 'var(--text)' }}>
             <Toaster richColors position="top-right" />
-            <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', borderBottom: '1px solid #1f2937' }}>
-                <h1 style={{ fontSize: 18, fontWeight: 600 }}>Minecraft Dashboard</h1>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                    <div title="Admin token for protected API calls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input
-                            placeholder="Admin token (optional)"
-                            value={adminToken}
-                            onChange={(e: any) => { setAdminToken(e.target.value); localStorage.setItem('adminToken', e.target.value) }}
-                            style={{ ...inputStyle(), width: 220 }}
-                        />
+            <header className="header" style={{ padding: '0 16px', borderBottom: '1px solid var(--border)' }}>
+                <div className="header-row header-center"><h1 className="minecraft-title" style={{ fontSize: 18 }}>Minecraft Dashboard</h1></div>
+                <div className="header-row" style={{ justifyContent: 'space-between' }}>
+                    <div className="row" style={{ gap: 10 }}>
+                        <Badge label={`Status: ${statusLabel}`} kind={statusKind} />
+                        <Badge label={dockerOk ? 'Docker: ready' : 'Docker: unavailable'} kind={dockerOk ? 'ok' : 'err'} />
+                        <div>Players: {players.length}</div>
                     </div>
-                    <button title="Start server with current settings" onClick={start} style={btnStyle('#16a34a')}><Play size={18} /> Start</button>
-                    <button title="Stop" onClick={stop} style={btnStyle('#dc2626')}><Square size={18} /> Stop</button>
-                    <button title="Restart" onClick={restart} style={btnStyle('#f59e0b')}><RotateCcw size={18} /> Restart</button>
+                    <div className="row" style={{ gap: 8 }}>
+                        <div title="Admin token for protected API calls" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input
+                                placeholder="Admin token (optional)"
+                                value={adminToken}
+                                onChange={(e: any) => { setAdminToken(e.target.value); localStorage.setItem('adminToken', e.target.value) }}
+                                className="input" style={{ width: 240 }}
+                            />
+                        </div>
+                        <button title="Start server with current settings" onClick={() => { start().then(() => toast.message('Starting...')) }} className="btn green" disabled={!dockerOk}><Play size={18} /> Start</button>
+                        <button title="Stop" onClick={() => { stop().then(() => toast.message('Stopping...')) }} className="btn red" disabled={!dockerOk}><Square size={18} /> Stop</button>
+                        <button title="Restart" onClick={() => { restart().then(() => toast.message('Restarting...')) }} className="btn amber" disabled={!dockerOk}><RotateCcw size={18} /> Restart</button>
+                    </div>
                 </div>
             </header>
 
-            <main style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 12, padding: 12 }}>
-                <section style={{ border: '1px solid #1f2937', borderRadius: 8, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ padding: 8, background: '#111827', borderBottom: '1px solid #1f2937' }}>Chat</div>
-                    <div style={{ flex: 1, padding: 12, overflowY: 'auto' }}>
-                        {messages.map((m, i) => (
-                            <div key={i} style={{ marginBottom: 6 }}>
-                                <span>{m}</span>
+            <main className="grid grid-cols" style={{ padding: 12 }}>
+                <section className="panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div className="panel-title">Chat</div>
+                    <div className="panel-body chat">
+                        {!dockerOk && (
+                            <div className="banner">
+                                Docker is not available. Start Docker Desktop to run the server. You can still view info and chat history.
                             </div>
-                        ))}
+                        )}
+                        <div className="chat-inner">
+                            {messages.map((m, i) => (
+                                <div key={i} style={{ marginBottom: 6 }}>
+                                    <span>{m}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </section>
-                <aside style={{ border: '1px solid #1f2937', borderRadius: 8 }}>
-                    <div style={{ padding: 8, background: '#111827', borderBottom: '1px solid #1f2937' }}>Panel</div>
-                    <div style={{ padding: 12, fontSize: 14, color: '#94a3b8' }}>
-                        <div style={{ display: 'grid', gap: 8 }}>
-                            <label title="Initial heap size (Xms)">Xms (GB)
-                                <input type="number" min={1} max={64} value={xms} onChange={(e: any) => setXms(Number(e.target.value))} style={inputStyle()} />
-                            </label>
-                            <label title="Maximum heap size (Xmx)">Xmx (GB)
-                                <input type="number" min={1} max={64} value={xmx} onChange={(e: any) => setXmx(Number(e.target.value))} style={inputStyle()} />
-                            </label>
-                            <small>These values override backend config for this start.</small>
-                            <div style={{ height: 1, background: '#1f2937', margin: '8px 0' }} />
-                            <div>
-                                <div>Status: {status ? (status.online ? 'Online' : (status.running ? 'Starting...' : 'Stopped')) : 'Unknown'}</div>
-                                <div>Players ({players.length}): {players.join(', ')}</div>
-                                <div style={{ marginTop: 8 }}>
-                                    <button
-                                        title="Manual save (flush and commit/push)"
-                                        onClick={async () => {
-                                            const headers: Record<string, string> = {}
-                                            if (adminToken) headers['X-Admin-Token'] = adminToken
-                                            const r = await fetch('/api/server/save', { method: 'POST', headers })
-                                            r.ok ? toast.success('Save requested') : toast.error('Save failed')
-                                        }}
-                                        style={btnStyle('#0ea5e9')}
-                                    >Save Now</button>
+                <aside className="panel" style={{ position: 'relative', transition: 'width .25s ease' }}>
+                    <div className="panel-title">
+                        <span className="title-text">Controls & Info</span>
+                        <button
+                            className="caret-btn"
+                            onClick={(e) => {
+                                const root = (e.currentTarget.closest('.panel') as HTMLElement)
+                                const body = root.querySelector('.slide-content') as HTMLElement
+                                const collapsed = body.classList.toggle('collapsed')
+                                root.classList.toggle('collapsed', collapsed)
+                                root.style.width = collapsed ? '44px' : ''
+                            }}
+                            aria-label="Toggle controls"
+                        >
+                            <span className="caret-icon">◀</span>
+                        </button>
+                    </div>
+                    <div className="panel-body slide-wrap" style={{ fontSize: 14, color: 'var(--muted)' }}>
+                        <div className="slide-content">
+                            <div className="grid" style={{ gap: 8 }}>
+                                <label title="Initial heap size (Xms)">Xms (GB)
+                                    <input className="input" type="number" min={1} max={64} value={xms} onChange={(e: any) => setXms(Number(e.target.value))} />
+                                </label>
+                                <label title="Maximum heap size (Xmx)">Xmx (GB)
+                                    <input className="input" type="number" min={1} max={64} value={xmx} onChange={(e: any) => setXmx(Number(e.target.value))} />
+                                </label>
+                                <small>These values override backend config for this start.</small>
+                                <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
+                                <div>
+                                    <div>Players ({players.length}): {players.join(', ') || '—'}</div>
+                                    <div style={{ marginTop: 8 }}>
+                                        <button
+                                            title="Manual save (flush and commit/push)"
+                                            onClick={async () => {
+                                                const headers: Record<string, string> = {}
+                                                if (adminToken) headers['X-Admin-Token'] = adminToken
+                                                const r = await fetch('/api/server/save', { method: 'POST', headers })
+                                                r.ok ? toast.success('Save requested') : toast.error('Save failed')
+                                            }}
+                                            className="btn cyan" disabled={!dockerOk}
+                                        >Save Now</button>
+                                    </div>
+                                </div>
+                                <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />
+                                <div>
+                                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Config</div>
+                                    <div>Repo: {cfg?.repo?.url || '—'}</div>
+                                    <div>Branch: {cfg?.repo?.branch || '—'}</div>
+                                    <div>Path: {cfg?.repo?.path || '—'}</div>
+                                    <div>RCON: {cfg?.rcon?.enable ? `${cfg?.rcon?.host}:${cfg?.rcon?.port}` : 'disabled'}</div>
                                 </div>
                             </div>
                         </div>
@@ -175,30 +246,12 @@ export default function App() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && input.trim()) { send(input); setInput('') } }}
-                    style={{ flex: 1, background: '#111827', color: '#e2e8f0', border: '1px solid #1f2937', borderRadius: 6, padding: '8px 10px' }}
+                    className="input" style={{ flex: 1, padding: '8px 10px' }}
+                    ref={inputRef}
                 />
-                <button onClick={() => { if (input.trim()) { send(input); setInput('') } }} style={btnStyle('#2563eb')}>Send</button>
+                <button onClick={() => { if (input.trim()) { send(input); setInput('') } }} className="btn">Send</button>
             </footer>
         </div>
     )
 }
-
-function btnStyle(color: string): React.CSSProperties {
-    return {
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        background: color, color: 'white', padding: '8px 12px',
-        border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600
-    }
-}
-
-function inputStyle(): React.CSSProperties {
-    return {
-        width: '100%',
-        background: '#0b1220',
-        color: '#e2e8f0',
-        border: '1px solid #1f2937',
-        borderRadius: 6,
-        padding: '6px 8px',
-        marginTop: 4,
-    }
-}
+// end

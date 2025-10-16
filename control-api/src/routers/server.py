@@ -208,11 +208,23 @@ def status():
     cfg = settings.config
     from ..services.docker_ops import DockerManager
 
-    dm = DockerManager()
-    st = dm.container_status(cfg.mc_container_name)
+    try:
+        dm = DockerManager()
+        st = dm.container_status(cfg.mc_container_name)
+        docker_available = True
+    except Exception:
+        # Docker daemon is not reachable (e.g., Docker Desktop not running)
+        st = "docker-unavailable"
+        docker_available = False
     from ..state import runtime
 
-    return {"running": st == "running", "online": runtime.online, "container": cfg.mc_container_name, "status": st}
+    return {
+        "running": st == "running",
+        "online": runtime.online,
+        "container": cfg.mc_container_name,
+        "status": st,
+        "docker_available": docker_available,
+    }
 
 
 @router.get("/info")
