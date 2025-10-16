@@ -151,7 +151,8 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     flags = [xms, xmx] + (
         (body.extra_jvm_flags or []) if body.extra_jvm_flags is not None else (cfg.extra_jvm_flags or [])
     )
-    command = ["java", *flags, "-jar", jar.name, "--nogui"]
+    # Use 'nogui' (without dashes) for compatibility with some Fabric setups
+    command = ["java", *flags, "-jar", jar.name, "nogui"]
 
     env = {
         "EULA": "TRUE",

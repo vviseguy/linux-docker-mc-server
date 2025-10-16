@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 import os
 import re
+from pathlib import PurePosixPath
 
 
 def default_java_image(java_version: int) -> str:
@@ -51,6 +52,38 @@ class DockerManager:
     def __init__(self):
         self.client = docker.from_env()
 
+    def _container_host_path_for(self, container_path: Path) -> Optional[str]:
+        """
+        Translate a path inside this control-api container (e.g., /app/data/xyz)
+        to the corresponding host path by inspecting this container's mounts.
+        Returns None if mapping cannot be determined.
+        """
+        try:
+            # Default to the configured container name from compose
+            self_name = os.getenv("CONTROL_API_CONTAINER_NAME", "mc-control-api")
+            c = self.client.containers.get(self_name)
+            mounts = c.attrs.get("Mounts", [])
+            c_path = str(container_path)
+            best = None
+            best_len = -1
+            for m in mounts:
+                dest = m.get("Destination")
+                src = m.get("Source")
+                if not dest or not src:
+                    continue
+                # Choose the longest matching destination prefix
+                if c_path.startswith(dest) and len(dest) > best_len:
+                    best = (dest, src)
+                    best_len = len(dest)
+            if best is None:
+                return None
+            dest, src = best
+            rel = os.path.relpath(c_path, dest)
+            host_path = os.path.normpath(os.path.join(src, rel))
+            return host_path
+        except Exception:
+            return None
+
     def ensure_image(self, image: str):
         try:
             self.client.images.get(image)
@@ -68,8 +101,12 @@ class DockerManager:
         workdir: str = "/data",
     ):
         self.ensure_image(java_image)
-        # Mount the repo as /data
-        binds = {str(repo_host_dir.resolve()): {"bind": "/data", "mode": "rw"}}
+        # Mount the repo as /data. If we're running inside a container, translate to host path.
+        src_path = str(repo_host_dir.resolve())
+        host_src = self._container_host_path_for(repo_host_dir)
+        if host_src:
+            src_path = host_src
+        binds = {src_path: {"bind": "/data", "mode": "rw"}}
         # Default MC server ports
         port_map = {f"{p}/tcp": p for p in ports.keys()}
         container = self.client.containers.run(
