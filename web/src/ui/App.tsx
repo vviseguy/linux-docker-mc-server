@@ -69,8 +69,8 @@ export default function App() {
     const start = async () => {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (adminToken) headers['X-Admin-Token'] = adminToken
-    const body: any = { xms_gb: xms, xmx_gb: xmx, use_itzg: useItzg }
-    if (!useItzg && javaVersion) body.java_version = javaVersion
+        const body: any = { xms_gb: xms, xmx_gb: xmx, use_itzg: useItzg }
+        if (!useItzg && javaVersion) body.java_version = javaVersion
         if (selectedServer) body.server_name = selectedServer
         const res = await fetch('/api/server/start', { method: 'POST', headers, body: JSON.stringify(body) })
         if (!res.ok) {
