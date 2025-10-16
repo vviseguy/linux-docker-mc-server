@@ -30,19 +30,17 @@ def _normalize_name(s: str) -> str:
 
 
 def _is_runnable_dir(p: Path) -> bool:
-    return ((p / "start.sh").exists() or (p / "start.bat").exists() or any(p.glob("*.jar")))
+    return (p / "start.sh").exists() or (p / "start.bat").exists() or any(p.glob("*.jar"))
 
 
 def _list_runnable_servers(base: Path) -> list[dict]:
     items: list[dict] = []
     # Prefer subdirectories; include base if it is runnable too
-    for child in sorted([d for d in base.iterdir() if d.is_dir() and not d.name.startswith('.')]):
+    for child in sorted([d for d in base.iterdir() if d.is_dir() and not d.name.startswith(".")]):
         if _is_runnable_dir(child):
-            items.append({
-                "name": child.name,
-                "normalized": _normalize_name(child.name),
-                "path": str(child.relative_to(base))
-            })
+            items.append(
+                {"name": child.name, "normalized": _normalize_name(child.name), "path": str(child.relative_to(base))}
+            )
     if _is_runnable_dir(base):
         items.insert(0, {"name": "root", "normalized": _normalize_name("root"), "path": "."})
     return items
@@ -52,7 +50,8 @@ def _list_runnable_servers(base: Path) -> list[dict]:
 def list_servers():
     cfg = settings.config
     from ..settings import settings as _settings
-    base = (_settings.root / cfg.repo.path)
+
+    base = _settings.root / cfg.repo.path
     base.mkdir(parents=True, exist_ok=True)
     return {"servers": _list_runnable_servers(base)}
 
@@ -75,7 +74,7 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
             return base
         # Look one level down for a folder with jar or start script
         for child in sorted([p for p in base.iterdir() if p.is_dir()]):
-            if child.name.startswith('.'):
+            if child.name.startswith("."):
                 continue
             if (child / "start.sh").exists() or (child / "start.bat").exists() or list(child.glob("*.jar")):
                 return child
@@ -87,10 +86,15 @@ def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
         candidates = _list_runnable_servers(data_dir)
         match = next((c for c in candidates if c["normalized"] == wanted), None)
         if not match:
-            raise HTTPException(status_code=404, detail=f"Server '{body.server_name}' not found. Available: {', '.join([c['name'] for c in candidates])}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Server '{body.server_name}' not found. Available: {', '.join([c['name'] for c in candidates])}",
+            )
         server_root = (data_dir / match["path"]).resolve()
         if not _is_runnable_dir(server_root):
-            raise HTTPException(status_code=400, detail=f"Selected folder '{match['name']}' is not runnable (no jar or start script)")
+            raise HTTPException(
+                status_code=400, detail=f"Selected folder '{match['name']}' is not runnable (no jar or start script)"
+            )
     else:
         server_root = find_server_root(data_dir)
     session_branch = None
