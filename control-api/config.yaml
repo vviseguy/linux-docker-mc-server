@@ -1,0 +1,23 @@
+# Backend configuration
+admin_token: null  # optional; set via env ADMIN_TOKEN to protect write endpoints
+sync_interval_seconds: 300
+
+repo:
+  url: "https://github.com/vviseguy/drehmal-mc-server.git"      # e.g. https://github.com/yourname/your-mc-server.git
+  branch: main
+  session_branch_prefix: sessions
+  path: data
+
+rcon:
+  enable: true
+  host: host.docker.internal
+  port: 25575
+  password: change_me
+
+logs_dir: logs
+mc_container_name: mc-server
+java_version: 21         # 17 or 21; Paper requires 21 for modern versions
+java_image: null         # override container image, else eclipse-temurin:{java_version}-jre
+xms_gb: 2
+xmx_gb: 4
+extra_jvm_flags: []      # e.g. ["-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200"]

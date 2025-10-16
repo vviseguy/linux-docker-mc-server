@@ -1,13 +1,21 @@
-# Node & TypeScript build artifacts
-web/node_modules/
-web/*.js.map
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Editor
-.vscode/
-.venv
-*.pyc
+# Dependencies and environments
+node_modules/
+dist/
+.venv/
+venv/
 __pycache__/
+*.pyc
+
+# Editor/OS
+.DS_Store
+.vscode/
+
+# Python
+.pytest_cache/
+
+# Local data clones and runtime
+data/
+logs/
+
+# Env
+.env

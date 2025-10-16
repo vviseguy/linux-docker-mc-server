@@ -1,12 +1,25 @@
 {
-    "name": "mc-console-web",
+    "name": "mc-dashboard",
+    "version": "0.1.0",
     "private": true,
     "type": "module",
-    "version": "0.1.0",
     "scripts": {
-        "build": "tsc -p ."
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "react": "18.3.1",
+        "react-dom": "18.3.1",
+        "zustand": "4.5.5",
+        "sonner": "1.5.0",
+        "lucide-react": "0.460.0"
     },
     "devDependencies": {
-        "typescript": "^5.6.3"
+        "@types/react": "18.3.5",
+        "@types/react-dom": "18.3.0",
+        "typescript": "5.6.3",
+        "vite": "5.4.6",
+        "@vitejs/plugin-react": "4.3.2"
     }
 }

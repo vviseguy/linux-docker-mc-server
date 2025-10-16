@@ -1,7 +1,0 @@
-version: "3.9"
-
-services:
-  # Minimal single-container TCP setup (no proxy, plain HTTP)
-  control-api:
-    ports:
-      - "${API_PORT:-8080}:8080"
