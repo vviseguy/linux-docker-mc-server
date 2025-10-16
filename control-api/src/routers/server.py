@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from pathlib import Path
 from ..settings import settings
 from ..state import runtime
-from ..services.git_ops import GitManager
 from ..services.docker_ops import DockerManager, parse_start_bat, parse_start_sh, default_java_image
 from ..services.rcon_bridge import list_players
 from ..utils.server_properties import ensure_rcon_and_eula
@@ -25,26 +24,15 @@ class StartRequest(BaseModel):
 @router.post("/start")
 def start_server(body: StartRequest, _: bool = Depends(require_admin_token)):
     cfg = settings.config
-    repo_url = body.repo_url or cfg.repo.url
-    if not repo_url:
-        raise HTTPException(status_code=400, detail="No repo URL configured")
+    # Git is removed; repo_url is ignored. We just use the local data directory.
 
     # Use configured app root (works locally and in container)
     from ..settings import settings as _settings
 
     data_dir = _settings.root / cfg.repo.path
-    gm = GitManager(
-        workdir=data_dir,
-        repo_url=repo_url,
-        main_branch=cfg.repo.branch,
-        sessions_prefix=cfg.repo.session_branch_prefix,
-        username=cfg.repo.username,
-        token=cfg.repo.token,
-    )
-    repo = gm.ensure_clone()
-    gm.pull_main()
-    session_branch = gm.create_session_branch()
-    runtime.session_branch = session_branch
+    data_dir.mkdir(parents=True, exist_ok=True)
+    session_branch = None
+    runtime.session_branch = None
 
     # Ensure RCON and EULA
     server_port = ensure_rcon_and_eula(data_dir, cfg.rcon.port, cfg.rcon.password)
@@ -149,21 +137,7 @@ def stop_server(force: bool = False, _: bool = Depends(require_admin_token)):
     dm = DockerManager()
     stopped = dm.stop_container(cfg.mc_container_name)
 
-    # Final push and merge
-    if runtime.session_branch:
-        from ..settings import settings as _settings
-
-        gm = GitManager(
-            workdir=_settings.root / cfg.repo.path,
-            repo_url=settings.config.repo.url,
-            main_branch=cfg.repo.branch,
-            sessions_prefix=cfg.repo.session_branch_prefix,
-        )
-        gm.ensure_clone()
-        gm.commit_all("Final save")
-        gm.push(runtime.session_branch)
-        gm.merge_to_main_overwrite_current(runtime.session_branch)
-        runtime.session_branch = None
+    # No git actions; just stop
     # reset online flag after stop
     runtime.online = False
 
@@ -180,20 +154,7 @@ def save_now(_: bool = Depends(require_admin_token)):
         run_command(cfg.rcon.host, cfg.rcon.port, cfg.rcon.password, "save-all flush")
     except Exception:
         pass
-    # Commit and push to session branch if active
-    if runtime.session_branch:
-        from ..settings import settings as _settings
-
-        gm = GitManager(
-            workdir=_settings.root / cfg.repo.path,
-            repo_url=settings.config.repo.url,
-            main_branch=cfg.repo.branch,
-            sessions_prefix=cfg.repo.session_branch_prefix,
-        )
-        gm.ensure_clone()
-        gm.commit_all("Manual save")
-        gm.push(runtime.session_branch)
-        return {"saved": True, "branch": runtime.session_branch}
+    # No git actions
     return {"saved": False, "branch": None}
 
 
@@ -218,22 +179,12 @@ def status():
         docker_available = False
     from ..state import runtime
 
-    # Detect host-side git agent (via control folder created by host_git_agent.py)
-    try:
-        from ..settings import settings as _settings
-
-        data_dir = _settings.root / cfg.repo.path
-        agent_available = (data_dir / ".ctl" / "requests").exists()
-    except Exception:
-        agent_available = False
-
     return {
         "running": st == "running",
         "online": runtime.online,
         "container": cfg.mc_container_name,
         "status": st,
         "docker_available": docker_available,
-        "agent_available": agent_available,
     }
 
 

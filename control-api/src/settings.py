@@ -35,6 +35,7 @@ class AppConfig:
     xms_gb: int = 2
     xmx_gb: int = 4
     extra_jvm_flags: list[str] = field(default_factory=list)  # e.g., ["-XX:+UseG1GC"]
+    git_enabled: bool = False
 
 
 class Settings:
@@ -58,6 +59,13 @@ class Settings:
 
         repo = data.get("repo", {})
         rcon = data.get("rcon", {})
+
+        # Parse env bool for git toggle
+        def env_bool(name: str, default: bool) -> bool:
+            v = os.getenv(name)
+            if v is None:
+                return default
+            return str(v).strip().lower() in {"1", "true", "yes", "on"}
 
         cfg = AppConfig(
             admin_token=admin_token,
@@ -83,6 +91,7 @@ class Settings:
             xms_gb=int(data.get("xms_gb", 2)),
             xmx_gb=int(data.get("xmx_gb", 4)),
             extra_jvm_flags=data.get("extra_jvm_flags", []),
+            git_enabled=env_bool("GIT_ENABLED", bool(data.get("git_enabled", False))),
         )
         return cfg
 

@@ -6,6 +6,7 @@ import os
 import json
 import time
 from uuid import uuid4
+import shutil
 
 
 class GitManager:
@@ -45,8 +46,28 @@ class GitManager:
                 pass
         else:
             self.workdir.parent.mkdir(parents=True, exist_ok=True)
+            # If directory exists and is not empty (ignoring .ctl), prevent clone unless it's effectively empty.
+            if self.workdir.exists():
+                entries = [e for e in self.workdir.iterdir() if e.name not in {".ctl", ".git"}]
+                if entries:
+                    raise RuntimeError(
+                        f"Destination path {self.workdir} already exists and is not empty. "
+                        "Either pre-clone your repo into this folder, move/backup existing files, or perform an initial import as described in the README."
+                    )
+                # If only .ctl exists, remove it temporarily to allow clone, we will recreate it.
+                ctl_path = self.workdir / ".ctl"
+                if ctl_path.exists():
+                    shutil.rmtree(ctl_path, ignore_errors=True)
             url = _inject_auth(self.repo_url)
             self.repo = Repo.clone_from(url, self.workdir)
+            # Recreate .ctl structure for host agent if used
+            ctl_req = self.workdir / ".ctl" / "requests"
+            ctl_res = self.workdir / ".ctl" / "responses"
+            try:
+                ctl_req.mkdir(parents=True, exist_ok=True)
+                ctl_res.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
         return self.repo
 
     # Helper to dispatch to a host-side git agent via data/.ctl when available
